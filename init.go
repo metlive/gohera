@@ -1,19 +1,8 @@
-/*
- * Copyright (c) 2023. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
- * Morbi non lorem porttitor neque feugiat blandit. Ut vitae ipsum eget quam lacinia accumsan.
- * Etiam sed turpis ac ipsum condimentum fringilla. Maecenas magna.
- * Proin dapibus sapien vel ante. Aliquam erat volutpat. Pellentesque sagittis ligula eget metus.
- * Vestibulum commodo. Ut rhoncus gravida arcu.
- */
-
 package gohera
 
 import (
 	"flag"
-	"time"
 
-	"1v1.group/mysql"
-	"1v1.group/redis"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -52,29 +41,29 @@ func InitApp() error {
 	})
 
 	// mysql初始化
-	if IsSet("mysql") {
-		mysqlConf := GetStringMap("mysql")
-		Mysql, err = mysql.New(mysqlConf)
-		if err != nil {
-			return err
-		}
-		// 非生产环境开启sql日志
-		if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
-			Mysql.ShowSQL(true)
-			if GetEnv() == DeployEnvTest {
-				Mysql.SetConnMaxLifetime(1 * time.Minute)
-			}
-		}
-	}
-
-	// redis初始化
-	if IsSet("redis") {
-		redisConfig := GetStringMap("redis")
-		Redis, err = redis.New(redisConfig)
-		if err != nil {
-			return err
-		}
-	}
+	//if IsSet("mysql") {
+	//	mysqlConf := GetStringMap("mysql")
+	//	Mysql, err = mysql.New(mysqlConf)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	// 非生产环境开启sql日志
+	//	if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
+	//		Mysql.ShowSQL(true)
+	//		if GetEnv() == DeployEnvTest {
+	//			Mysql.SetConnMaxLifetime(1 * time.Minute)
+	//		}
+	//	}
+	//}
+	//
+	//// redis初始化
+	//if IsSet("redis") {
+	//	redisConfig := GetStringMap("redis")
+	//	Redis, err = redis.New(redisConfig)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 }

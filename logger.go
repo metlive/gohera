@@ -16,15 +16,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// 定义键名
-const (
-	TraceIDKey = "trace_id"
-	UserIDKey  = "user_id"
-)
+type Trace struct {
+	TraceId string `json:"trace_id"`
+	SpanId  string `json:"span_id"`
+	UserId  int    `json:"user_id"`
+	Method  string `json:"method"`
+	Path    string `json:"path"`
+	Status  int    `json:"status"`
+}
 
 type (
-	traceIDContextKey struct{}
-	userIDContextKey  struct{}
+	traceContext struct{}
 )
 
 // Entry 定义统一的日志写入方式
@@ -49,36 +51,25 @@ func initLoggerPool(config loggerConfig) {
 	logger = zap.New(core, filed).WithOptions(zap.AddCaller())
 }
 
-// NewTraceIDContext 创建跟踪ID上下文
-func NewTraceIDContext(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, traceIDContextKey{}, traceID)
+func getEncoder() zapcore.Encoder {
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.TimeKey = "time"
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
+	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+	return zapcore.NewJSONEncoder(encoderConfig)
 }
 
 // FromTraceIDContext 从上下文中获取跟踪ID
-func FromTraceIDContext(ctx context.Context) string {
-	v := ctx.Value(traceIDContextKey{})
+func FromTraceContext(ctx context.Context) Trace {
+	v := ctx.Value(traceContext{})
 	if v != nil {
-		if s, ok := v.(string); ok {
+		if s, ok := v.(Trace); ok {
 			return s
 		}
 	}
-	return ""
-}
-
-// NewUserIDContext 创建用户ID上下文
-func NewUserIDContext(ctx context.Context, userID string) context.Context {
-	return context.WithValue(ctx, userIDContextKey{}, userID)
-}
-
-// FromUserIDContext 从上下文中获取用户ID
-func FromUserIDContext(ctx context.Context) string {
-	v := ctx.Value(userIDContextKey{})
-	if v != nil {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
+	return make(Trace, 0)
 }
 
 // StartSpan 开始一个追踪单元
@@ -86,15 +77,10 @@ func getContextFields(ctx context.Context) []zap.Field {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	fields := map[string]string{
-		UserIDKey:  FromUserIDContext(ctx),
-		TraceIDKey: FromTraceIDContext(ctx),
-	}
 	zapFiled := make([]zap.Field, 0)
-	for traceName, traceValue := range fields {
-		if traceValue != "" {
-			zapFiled = append(zapFiled, zap.String(traceName, traceValue))
-		}
+	traceInfo := FromTraceContext(ctx)
+	for key, val := range traceInfo {
+		zapFiled = append(zapFiled, zap.String(key, val))
 	}
 	return zapFiled
 }
