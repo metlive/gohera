@@ -18,14 +18,14 @@
 具体使用方法细节可以参考https://wiki.zhiyinlou.com/display/businessDahai/Go+Module
 ```go
 // 安装方式
-go get -v -t 1v1.group/gohera
+go get -v -t github.com/metlive/gohera
 // 或者 
-import "1v1.group/gohera"
+import "github.com/metlive/gohera"
 
 // 设置goproxy
 go env -w GOPROXY=https://goproxy.cn/,https://mirrors.aliyun.com/goproxy/,direct
 // 设置GOPRIVATE跳过私有库，比如常用的Gitlab或Gitee，关闭校验
-go env -w GOPRIVATE=*.gitlab.com,*.gitee.com,*.100tal.com,1v1.group
+go env -w GOPRIVATE=*.gitlab.com,*.gitee.com
 go env -w GOSUMDB=off
 // 开启GO111MODULE
 go env -w GO111MODULE=on
