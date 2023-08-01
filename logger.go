@@ -61,6 +61,11 @@ func getEncoder() zapcore.Encoder {
 	return zapcore.NewJSONEncoder(encoderConfig)
 }
 
+// NewTraceIDContext 创建跟踪ID上下文
+func NewTraceIDContext(ctx context.Context, traceID any) context.Context {
+	return context.WithValue(ctx, traceContext{}, traceID)
+}
+
 // FromTraceIDContext 从上下文中获取跟踪ID
 func FromTraceContext(ctx context.Context) Trace {
 	v := ctx.Value(traceContext{})
@@ -69,7 +74,7 @@ func FromTraceContext(ctx context.Context) Trace {
 			return s
 		}
 	}
-	return make(Trace, 0)
+	return Trace{}
 }
 
 // StartSpan 开始一个追踪单元
@@ -79,9 +84,11 @@ func getContextFields(ctx context.Context) []zap.Field {
 	}
 	zapFiled := make([]zap.Field, 0)
 	traceInfo := FromTraceContext(ctx)
-	for key, val := range traceInfo {
-		zapFiled = append(zapFiled, zap.String(key, val))
-	}
+	zapFiled = append(zapFiled, zap.String("trace_id", traceInfo.TraceId))
+	zapFiled = append(zapFiled, zap.String("span_id", traceInfo.SpanId))
+	zapFiled = append(zapFiled, zap.Int("user_id", traceInfo.UserId))
+	zapFiled = append(zapFiled, zap.String("path", traceInfo.Path))
+	zapFiled = append(zapFiled, zap.Int("status", traceInfo.Status))
 	return zapFiled
 }
 

@@ -23,7 +23,7 @@ func HandlerContext() gin.HandlerFunc {
 			}
 		}
 		userId := c.GetInt(TraceHeaderUserId)
-		ctx = context.WithValue(ctx, traceContext{}, &Trace{
+		NewTraceIDContext(ctx, &Trace{
 			TraceId: traceID,
 			SpanId:  "",
 			UserId:  userId,
@@ -31,7 +31,6 @@ func HandlerContext() gin.HandlerFunc {
 			Path:    c.Request.URL.Path,
 			Status:  c.Writer.Status(),
 		})
-		c.Set(TraceCtx, ctx)
 		c.Next()
 	}
 }
