@@ -1,4 +1,4 @@
-module 1v1.group/gohera
+module github.com/metlive/gohera
 
 go 1.20
 
