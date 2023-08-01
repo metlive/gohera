@@ -13,6 +13,8 @@ type httpResponse struct {
 	Result  any    `json:"result"`
 }
 
+var contexts *gin.Context
+
 func JsonError(c *gin.Context, code int, message ...string) {
 	msg := GetMessage(DefaultErrorMsg)
 	if len(message) <= 0 {

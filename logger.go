@@ -3,7 +3,10 @@ package gohera
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -18,7 +21,7 @@ type Trace struct {
 }
 
 type (
-	traceContext struct{}
+	traceContextId struct{}
 )
 
 // Entry 定义统一的日志写入方式
@@ -33,34 +36,77 @@ type loggerConfig struct {
 }
 
 func initLoggerPool(config loggerConfig) {
-	var allCore []zapcore.Core
+	// 调试级别
+	debugPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
+		return lev == zap.DebugLevel
+	})
+	// 日志级别
+	infoPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
+		return lev == zap.InfoLevel
+	})
+	// 警告级别
+	warnPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
+		return lev == zap.WarnLevel
+	})
+	// 错误级别
+	errorPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
+		return lev >= zap.ErrorLevel
+	})
+	cores := []zapcore.Core{
+		getEncoderCore(fmt.Sprintf("./%s/server_debug.log", config.FilePath), debugPriority, config),
+		getEncoderCore(fmt.Sprintf("./%s/server_info.log", config.FilePath), infoPriority, config),
+		getEncoderCore(fmt.Sprintf("./%s/server_warn.log", config.FilePath), warnPriority, config),
+		getEncoderCore(fmt.Sprintf("./%s/server_error.log", config.FilePath), errorPriority, config),
+	}
 	// 设置初始化字段
 	filed := zap.Fields(
 		zap.String("type", "go"),
 		zap.String("project", GetAppName()),
 	)
-	core := zapcore.NewTee(allCore...)
-	logger = zap.New(core, filed).WithOptions(zap.AddCaller())
+	core := zapcore.NewTee(cores...)
+	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
 }
 
-func getEncoder() zapcore.Encoder {
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.TimeKey = "time"
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	encoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
-	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	return zapcore.NewJSONEncoder(encoderConfig)
+// getEncoderCore 获取Encoder的zapcore.Core
+func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
+	// 每小时一个文件
+	logf, _ := rotatelogs.New(fileName+".%Y%m%d%H",
+		rotatelogs.WithLinkName(fileName),
+		rotatelogs.WithMaxAge(7*24*time.Hour),
+		rotatelogs.WithRotationTime(time.Minute),
+	)
+	var writer zapcore.WriteSyncer
+	if config.Mode != "pro" {
+		writer = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(logf))
+	} else {
+		writer = zapcore.AddSync(logf)
+	}
+	return zapcore.NewCore(zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+		MessageKey:    "message",
+		LevelKey:      "level",
+		TimeKey:       "time",
+		NameKey:       "logger",
+		CallerKey:     "caller",
+		StacktraceKey: "trace",
+		LineEnding:    zapcore.DefaultLineEnding,
+		EncodeLevel:   zapcore.LowercaseLevelEncoder,
+		EncodeTime: func(t time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+			encoder.AppendString(t.Format("2006-01-02 15:04:05"))
+		},
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.FullCallerEncoder,
+		EncodeName:     zapcore.FullNameEncoder,
+	}), writer, level)
 }
 
 // NewTraceIDContext 创建跟踪ID上下文
-func NewTraceIDContext(ctx context.Context, traceID any) context.Context {
-	return context.WithValue(ctx, traceContext{}, traceID)
+func NewTraceIDContext(ctx context.Context, traceContext any) context.Context {
+	return context.WithValue(ctx, traceContextId{}, traceContext)
 }
 
 // FromTraceIDContext 从上下文中获取跟踪ID
 func FromTraceContext(ctx context.Context) Trace {
-	v := ctx.Value(traceContext{})
+	v := ctx.Value(traceContextId{})
 	if v != nil {
 		if s, ok := v.(Trace); ok {
 			return s

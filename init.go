@@ -33,7 +33,7 @@ func InitApp() error {
 		appPath = DefaultLogPath
 	}
 	initLoggerPool(loggerConfig{
-		FilePath:   appPath + "/" + appName + "_%Y%m%d.log",
+		FilePath:   appPath + "/" + appName,
 		MaxSize:    0,
 		MaxBackups: 0,
 		Compress:   false,

@@ -2,6 +2,7 @@ package gohera
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -31,6 +32,7 @@ func HandlerContext() gin.HandlerFunc {
 			Path:    c.Request.URL.Path,
 			Status:  c.Writer.Status(),
 		})
+		fmt.Printf("====================:%v", traceID)
 		c.Next()
 	}
 }
