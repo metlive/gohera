@@ -1,5 +1,14 @@
 package gohera
 
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+)
+
 var (
 	httpHost string
 	httpPort int

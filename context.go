@@ -1,8 +1,6 @@
 package gohera
 
 import (
-	"context"
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,7 +10,7 @@ import (
 
 func HandlerContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		//ctx := context.Background()
 		traceID := c.GetHeader(TraceHeaderTraceId)
 		if traceID == "" {
 			if c.GetHeader("HTTP_TRACE_ID") != "" {
@@ -24,15 +22,15 @@ func HandlerContext() gin.HandlerFunc {
 			}
 		}
 		userId := c.GetInt(TraceHeaderUserId)
-		NewTraceIDContext(ctx, &Trace{
+		t := &Trace{
 			TraceId: traceID,
 			SpanId:  "",
 			UserId:  userId,
 			Method:  c.Request.Method,
-			Path:    c.Request.URL.Path,
+			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),
-		})
-		fmt.Printf("====================:%v", traceID)
+		}
+		c.Set("trace", t)
 		c.Next()
 	}
 }

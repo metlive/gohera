@@ -3,6 +3,7 @@ package gohera
 import (
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"os"
 	"time"
 
@@ -70,10 +71,10 @@ func initLoggerPool(config loggerConfig) {
 // getEncoderCore 获取Encoder的zapcore.Core
 func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
 	// 每小时一个文件
-	logf, _ := rotatelogs.New(fileName+".%Y%m%d%H",
+	logf, _ := rotatelogs.New(fileName+".%Y-%m-%d",
 		rotatelogs.WithLinkName(fileName),
 		rotatelogs.WithMaxAge(7*24*time.Hour),
-		rotatelogs.WithRotationTime(time.Minute),
+		rotatelogs.WithRotationTime(24*time.Hour),
 	)
 	var writer zapcore.WriteSyncer
 	if config.Mode != "pro" {
@@ -84,10 +85,10 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		MessageKey:    "message",
 		LevelKey:      "level",
+		StacktraceKey: "trace",
 		TimeKey:       "time",
 		NameKey:       "logger",
 		CallerKey:     "caller",
-		StacktraceKey: "trace",
 		LineEnding:    zapcore.DefaultLineEnding,
 		EncodeLevel:   zapcore.LowercaseLevelEncoder,
 		EncodeTime: func(t time.Time, encoder zapcore.PrimitiveArrayEncoder) {
@@ -99,20 +100,14 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 	}), writer, level)
 }
 
-// NewTraceIDContext 创建跟踪ID上下文
-func NewTraceIDContext(ctx context.Context, traceContext any) context.Context {
-	return context.WithValue(ctx, traceContextId{}, traceContext)
-}
-
 // FromTraceIDContext 从上下文中获取跟踪ID
-func FromTraceContext(ctx context.Context) Trace {
-	v := ctx.Value(traceContextId{})
-	if v != nil {
-		if s, ok := v.(Trace); ok {
-			return s
-		}
+func GetTraceContext(ctx context.Context) *Trace {
+	if ctxValue, ok := ctx.(*gin.Context); ok {
+		return ctxValue.MustGet("trace").(*Trace)
+	} else {
+		return ctx.Value("trace").(*Trace)
 	}
-	return Trace{}
+	return new(Trace)
 }
 
 // StartSpan 开始一个追踪单元
@@ -121,7 +116,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 		ctx = context.Background()
 	}
 	zapFiled := make([]zap.Field, 0)
-	traceInfo := FromTraceContext(ctx)
+	traceInfo := GetTraceContext(ctx)
 	zapFiled = append(zapFiled, zap.String("trace_id", traceInfo.TraceId))
 	zapFiled = append(zapFiled, zap.String("span_id", traceInfo.SpanId))
 	zapFiled = append(zapFiled, zap.Int("user_id", traceInfo.UserId))
@@ -135,11 +130,7 @@ func StartSpan(ctx context.Context, format string, args ...interface{}) (string,
 	//判断是否有context
 	l := len(args)
 	if l > 0 {
-		if format == "" {
-			return fmt.Sprint(args[:l-1]...), getContextFields(ctx)
-		} else {
-			return fmt.Sprintf(format, args[:l-1]...), getContextFields(ctx)
-		}
+		return fmt.Sprintf(format, args[:l]...), getContextFields(ctx)
 	}
 	return format, []zap.Field{}
 }
