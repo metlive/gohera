@@ -30,7 +30,7 @@ func HandlerContext() gin.HandlerFunc {
 			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),
 		}
-		c.Set("trace", t)
+		c.Set(TraceCtx, t)
 		c.Next()
 	}
 }

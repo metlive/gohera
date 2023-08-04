@@ -21,10 +21,6 @@ type Trace struct {
 	Status  int    `json:"status"`
 }
 
-type (
-	traceContextId struct{}
-)
-
 // Entry 定义统一的日志写入方式
 var logger *zap.Logger
 
@@ -100,17 +96,17 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 	}), writer, level)
 }
 
-// FromTraceIDContext 从上下文中获取跟踪ID
+// 从上下文中获取跟踪ID
 func GetTraceContext(ctx context.Context) *Trace {
 	if ctxValue, ok := ctx.(*gin.Context); ok {
-		return ctxValue.MustGet("trace").(*Trace)
+		return ctxValue.MustGet(TraceCtx).(*Trace)
 	} else {
-		return ctx.Value("trace").(*Trace)
+		return ctx.Value(TraceCtx).(*Trace)
 	}
 	return new(Trace)
 }
 
-// StartSpan 开始一个追踪单元
+// 开始一个追踪单元
 func getContextFields(ctx context.Context) []zap.Field {
 	if ctx == nil {
 		ctx = context.Background()
