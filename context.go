@@ -10,7 +10,6 @@ import (
 
 func HandlerContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//ctx := context.Background()
 		traceID := c.GetHeader(TraceHeaderTraceId)
 		if traceID == "" {
 			if c.GetHeader("HTTP_TRACE_ID") != "" {
