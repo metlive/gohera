@@ -2,8 +2,6 @@ package rotatelogs
 
 import (
 	"time"
-
-	"github.com/lestrrat-go/file-rotatelogs/internal/option"
 )
 
 const (
@@ -17,6 +15,30 @@ const (
 	optkeyForceNewFile  = "force-new-file"
 )
 
+type Option interface {
+	Name() string
+	Value() any
+}
+
+type option struct {
+	name  string
+	value any
+}
+
+func SelectorNew(name string, value any) *option {
+	return &option{
+		name:  name,
+		value: value,
+	}
+}
+
+func (o *option) Name() string {
+	return o.name
+}
+func (o *option) Value() any {
+	return o.value
+}
+
 // WithClock creates a new Option that sets a clock
 // that the RotateLogs object will use to determine
 // the current time.
@@ -26,7 +48,7 @@ const (
 // would rather use UTC, use rotatelogs.UTC as the argument
 // to this option, and pass it to the constructor.
 func WithClock(c Clock) Option {
-	return option.New(optkeyClock, c)
+	return SelectorNew(optkeyClock, c)
 }
 
 // WithLocation creates a new Option that sets up a
@@ -36,7 +58,7 @@ func WithClock(c Clock) Option {
 // This optin works by always returning the in the given
 // location.
 func WithLocation(loc *time.Location) Option {
-	return option.New(optkeyClock, clockFn(func() time.Time {
+	return SelectorNew(optkeyClock, clockFn(func() time.Time {
 		return time.Now().In(loc)
 	}))
 }
@@ -45,45 +67,45 @@ func WithLocation(loc *time.Location) Option {
 // symbolic link name that gets linked to the current
 // file name being used.
 func WithLinkName(s string) Option {
-	return option.New(optkeyLinkName, s)
+	return SelectorNew(optkeyLinkName, s)
 }
 
 // WithMaxAge creates a new Option that sets the
 // max age of a log file before it gets purged from
 // the file system.
 func WithMaxAge(d time.Duration) Option {
-	return option.New(optkeyMaxAge, d)
+	return SelectorNew(optkeyMaxAge, d)
 }
 
 // WithRotationTime creates a new Option that sets the
 // time between rotation.
 func WithRotationTime(d time.Duration) Option {
-	return option.New(optkeyRotationTime, d)
+	return SelectorNew(optkeyRotationTime, d)
 }
 
 // WithRotationSize creates a new Option that sets the
 // log file size between rotation.
 func WithRotationSize(s int64) Option {
-	return option.New(optkeyRotationSize, s)
+	return SelectorNew(optkeyRotationSize, s)
 }
 
 // WithRotationCount creates a new Option that sets the
 // number of files should be kept before it gets
 // purged from the file system.
 func WithRotationCount(n uint) Option {
-	return option.New(optkeyRotationCount, n)
+	return SelectorNew(optkeyRotationCount, n)
 }
 
 // WithHandler creates a new Option that specifies the
 // Handler object that gets invoked when an event occurs.
 // Currently `FileRotated` event is supported
 func WithHandler(h Handler) Option {
-	return option.New(optkeyHandler, h)
+	return SelectorNew(optkeyHandler, h)
 }
 
 // ForceNewFile ensures a new file is created every time New()
-// is called. If the base file name already exists, an implicit 
+// is called. If the base file name already exists, an implicit
 // rotation is performed
 func ForceNewFile() Option {
-	return option.New(optkeyForceNewFile, true)
+	return SelectorNew(optkeyForceNewFile, true)
 }

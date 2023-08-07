@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/metlive/gohera/rotatelogs"
 	"os"
 	"time"
 
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -67,7 +67,7 @@ func initLoggerPool(config loggerConfig) {
 // getEncoderCore 获取Encoder的zapcore.Core
 func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
 	// 每小时一个文件
-	logf, _ := rotatelogs.New(fileName+".%Y-%m-%d",
+	logf, _ := rotatelogs.New(fileName+"_%Y-%m-%d",
 		rotatelogs.WithLinkName(fileName),
 		rotatelogs.WithMaxAge(7*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),

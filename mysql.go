@@ -19,8 +19,7 @@ type Config struct {
 	Password     string        //密码
 	Host         string        //数据库地址
 	Port         int           //端口
-	SqlDebug     bool
-	Database     string //连接那个数据库
+	Database     string        //连接那个数据库
 }
 
 type DB struct {
@@ -45,8 +44,8 @@ type ConnectPool struct {
 func (o *ConnectPool) initPool(config *Config) (*DB, error) {
 	var dataSource []string
 	hosts := strings.Split(config.Host, ",")
-	for _, h := range hosts {
-		dataSource = append(dataSource, fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", config.User, config.Password, h, config.Database))
+	for _, host := range hosts {
+		dataSource = append(dataSource, fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", config.User, config.Password, host, config.Database))
 	}
 	o.Mutex.Lock()
 	defer o.Mutex.Unlock()

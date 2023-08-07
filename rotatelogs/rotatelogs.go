@@ -114,7 +114,7 @@ func (rl *RotateLogs) genFilename() string {
 	} else {
 		base = now.Truncate(time.Duration(rl.rotationTime))
 	}
-	return rl.pattern.FormatString(base)
+	return strings.ReplaceAll(rl.pattern.FormatString(base), ".log", "") + ".log"
 }
 
 // Write satisfies the io.Writer interface. It writes to the

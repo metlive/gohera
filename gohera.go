@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"sync/atomic"
+	"syscall"
 )
 
 var (
@@ -19,20 +22,31 @@ func StartHttpServer() error {
 	httpHost = GetString("http.host")
 	httpPort = GetInt("http.port")
 	if httpPort == 0 {
-		handleError(errors.New("http host or port is not valid"))
+		panic(errors.New("http host or port is not valid"))
 	}
-
-	fmt.Println("start on:" + "http://" + httpHost + ":" + strconv.Itoa(httpPort))
-	fmt.Printf("服务启动，运行模式：%v，版本号：%s，进程号：%d", GetEnv, "1.0.0", os.Getpid())
-
-	handleError(Engine.Run(httpHost + ":" + strconv.Itoa(httpPort)))
+	addr := httpHost + ":" + strconv.Itoa(httpPort)
+	ac := make(chan error)
+	go func() {
+		fmt.Printf("服务启动，运行模式：%v，版本号：%s，进程号：%d , ip：%s", GetEnv, "1.0.0", os.Getpid(), addr)
+		fmt.Println("")
+		err := Engine.Run(addr)
+		if err != nil && errors.Is(err, http.ErrServerClosed) {
+			fmt.Printf("监听HTTP服务: %v", err.Error())
+			ac <- err
+		}
+	}()
+	var state int32 = 1
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGTERM)
+	select {
+	case err := <-ac:
+		if err != nil && atomic.LoadInt32(&state) == 1 {
+			Error(context.Background(), "监听HTTP服务发生错误: %v", err.Error())
+			panic(fmt.Sprintf("监听HTTP服务发生错误: %v", err.Error()))
+		}
+	case sig := <-quit:
+		atomic.StoreInt32(&state, 0)
+		fmt.Printf("获取到退出信号: %v  pid %d", sig.String(), os.Getpid())
+	}
 	return nil
-}
-
-func handleError(err error) {
-	if err == nil || errors.Is(err, http.ErrServerClosed) {
-		return
-	}
-	Error(context.Background(), err, nil)
-	panic(err)
 }
