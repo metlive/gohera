@@ -2,6 +2,7 @@ package gohera
 
 import (
 	"flag"
+	"time"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -41,20 +42,20 @@ func InitApp() error {
 	})
 
 	// mysql初始化
-	//if IsSet("mysql") {
-	//	mysqlConf := GetStringMap("mysql")
-	//	Mysql, err = mysql.New(mysqlConf)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	// 非生产环境开启sql日志
-	//	if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
-	//		Mysql.ShowSQL(true)
-	//		if GetEnv() == DeployEnvTest {
-	//			Mysql.SetConnMaxLifetime(1 * time.Minute)
-	//		}
-	//	}
-	//}
+	if IsSet("mysql") {
+		mysqlConf := GetStringMap("mysql")
+		Mysql, err = NewMysql().initPool(mysqlConf)
+		if err != nil {
+			return err
+		}
+		// 非生产环境开启sql日志
+		if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
+			Mysql.ShowSQL(true)
+			if GetEnv() == DeployEnvTest {
+				Mysql.SetConnMaxLifetime(1 * time.Minute)
+			}
+		}
+	}
 	//
 	//// redis初始化
 	//if IsSet("redis") {

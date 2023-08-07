@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	//Mysql  *mysql.Engine
+	Mysql  *DB
 	Engine *gin.Engine
 	//Redis  *redis.Client
 )
