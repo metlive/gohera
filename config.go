@@ -24,7 +24,6 @@ func initAppConfig() error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -80,7 +79,7 @@ func GetStringSlice(key string) []string {
 	return config.GetStringSlice(key)
 }
 
-func GetStringMap(key string) map[string]interface{} {
+func GetStringMap(key string) map[string]any {
 	return config.GetStringMap(key)
 }
 
@@ -94,4 +93,8 @@ func GetStringMapStringSlice(key string) map[string][]string {
 
 func IsSet(key string) bool {
 	return config.IsSet(key)
+}
+
+func UnmarshalKey(key string, rawVal interface{}) error {
+	return config.UnmarshalKey(key, rawVal)
 }

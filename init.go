@@ -1,12 +1,13 @@
 package gohera
 
 import (
+	"encoding/json"
 	"flag"
-	"time"
-
+	"fmt"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"os"
 )
 
 var env = flag.String("env", DeployEnvDev, "The environment for app run")
@@ -43,18 +44,26 @@ func InitApp() error {
 
 	// mysql初始化
 	if IsSet("mysql") {
-		mysqlConf := GetStringMap("mysql")
-		Mysql, err = NewMysql().initPool(mysqlConf)
-		if err != nil {
-			return err
-		}
-		// 非生产环境开启sql日志
-		if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
-			Mysql.ShowSQL(true)
-			if GetEnv() == DeployEnvTest {
-				Mysql.SetConnMaxLifetime(1 * time.Minute)
+		dbList := GetStringMap("mysql")
+		fmt.Println("===========", dbList)
+		for key := range dbList {
+			fmt.Println("===========", key)
+			var conf dbConfig
+			if err = config.UnmarshalKey(key, &conf); err != nil {
+				panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 			}
+			d, _ := json.Marshal(conf)
+			fmt.Println("===test====", string(d))
+			//Mysql, err = NewMysql().initPool(mysqlParams)
+			//if err != nil {
+			//	return err
+			//}
 		}
+		//mysqlParams := new(dbConfig)
+		//if err = config.UnmarshalKey("mysql", &mysqlParams); err != nil {
+		//	panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
+		//}
+
 	}
 	//
 	//// redis初始化
