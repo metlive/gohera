@@ -58,25 +58,26 @@ func (o *ConnectPool) initPool(config *dbConfig) (*DB, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = obj.Ping()
+		err = obj.DB().Ping()
 		if err != nil {
 			return nil, err
 		}
 
 		// 设置空闲连接池中的最大连接数
-		obj.SetMaxIdleConns(config.MaxIdleConns)
+		obj.DB().SetMaxIdleConns(config.MaxIdleConns)
 		// 设置数据库连接最大打开数
-		obj.SetMaxOpenConns(config.MaxOpenConns)
+		obj.DB().SetMaxOpenConns(config.MaxOpenConns)
 		// 设置可重用连接的最长时间，一定要小于mysql服务端的保持超时时间，否则可能会被服务端关闭
-		obj.SetConnMaxLifetime(config.MaxLifeTime)
+		obj.DB().SetConnMaxLifetime(config.MaxLifeTime)
 		obj.SetMapper(names.GonicMapper{})
 		// 非生产环境开启sql日志
 		if GetEnv() == DeployEnvDev || GetEnv() == DeployEnvTest {
 			obj.ShowSQL(true)
 			if GetEnv() == DeployEnvTest {
-				obj.SetConnMaxLifetime(1 * time.Minute)
+				obj.DB().SetConnMaxLifetime(1 * time.Minute)
 			}
 		}
+		dbMap[config.Database] = obj
 		return &DB{obj}, nil
 	}
 }

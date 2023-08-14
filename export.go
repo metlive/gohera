@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Mysql  *DB
+	Mysql  = make(map[string]*DB)
 	Engine *gin.Engine
 	//Redis  *redis.Client
 )

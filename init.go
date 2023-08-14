@@ -1,7 +1,6 @@
 package gohera
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gin-contrib/pprof"
@@ -45,19 +44,21 @@ func InitApp() error {
 	// mysql初始化
 	if IsSet("mysql") {
 		dbList := GetStringMap("mysql")
-		fmt.Println("===========", dbList)
 		for key := range dbList {
-			fmt.Println("===========", key)
-			var conf dbConfig
-			if err = config.UnmarshalKey(key, &conf); err != nil {
-				panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
+			if IsSet("mysql." + key) {
+				var conf = new(dbConfig)
+				if err = config.UnmarshalKey("mysql."+key, &conf); err != nil {
+					panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
+				}
+				Mysql[key] = func(conf *dbConfig) *DB {
+					mysql, err := NewMysql().initPool(conf)
+					if err != nil {
+						return nil
+					}
+					return mysql
+				}(conf)
+				fmt.Println("==="+key+"====", *Mysql[key], Mysql[key].DataSourceName())
 			}
-			d, _ := json.Marshal(conf)
-			fmt.Println("===test====", string(d))
-			//Mysql, err = NewMysql().initPool(mysqlParams)
-			//if err != nil {
-			//	return err
-			//}
 		}
 		//mysqlParams := new(dbConfig)
 		//if err = config.UnmarshalKey("mysql", &mysqlParams); err != nil {
@@ -76,6 +77,14 @@ func InitApp() error {
 	//}
 
 	return nil
+}
+
+func geMySql(conf *dbConfig) *DB {
+	mysql, err := NewMysql().initPool(conf)
+	if err != nil {
+		return nil
+	}
+	return mysql
 }
 
 func InitHttpServer() {
