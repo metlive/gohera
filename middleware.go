@@ -1,14 +1,45 @@
 package gohera
 
-func registerMiddleware() {
-	// 初始化上下文
-	Engine.Use(HandlerContext())
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"strings"
+)
 
-	// 异常捕获
-	if GetEnv() != DeployEnvDev {
-		Engine.Use(HandlerRecovery(true))
+func TraceContext() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		traceID := c.GetHeader(TraceHeaderTraceId)
+		if traceID == "" {
+			if c.GetHeader("HTTP_TRACE_ID") != "" {
+				traceID = c.GetHeader("HTTP_TRACE_ID")
+			} else if c.GetHeader("TRACE_ID") != "" {
+				traceID = c.GetHeader("TRACE_ID")
+			} else {
+				traceID = strings.ReplaceAll(uuid.NewString(), "-", "")
+			}
+		}
+		userId := c.GetInt(TraceHeaderUserId)
+		t := &Trace{
+			TraceId: traceID,
+			SpanId:  "",
+			UserId:  userId,
+			Method:  c.Request.Method,
+			Path:    c.Request.URL.Host + c.Request.URL.Path,
+			Status:  c.Writer.Status(),
+		}
+		c.Set(TraceCtx, t)
+		c.Next()
 	}
+}
 
-	// 记录请求日志
-	//Engine.Use(HandleAppAccessLog())
+func RequestContext() gin.HandlerFunc {
+	return func(context *gin.Context) {
+
+	}
+}
+
+func RecoveryContext() gin.HandlerFunc {
+	return func(context *gin.Context) {
+
+	}
 }

@@ -31,6 +31,13 @@ func GetConfig(key string) interface{} {
 	return config.Get(key)
 }
 
+func GetDefaultString(key, defaultValue string) string {
+	if value := config.GetString(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func GetString(key string) string {
 	return config.GetString(key)
 }

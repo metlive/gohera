@@ -6,6 +6,9 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/metlive/gohera/mysql"
+	"github.com/metlive/gohera/redis"
+	"github.com/metlive/gohera/validator"
 	"os"
 )
 
@@ -13,26 +16,23 @@ var env = flag.String("env", DeployEnvDev, "The environment for app run")
 
 const DefaultLogPath = "/var/log/trace"
 
-func InitApp() error {
+func InitApp() (router *gin.Engine) {
 	flag.Parse()
 
 	// 解析环境变量
 	err := parseEnv(*env)
 	if err != nil {
-		return err
+		panic(fmt.Errorf("env parse fail ：  %s \n", err))
 	}
 
 	// 初始化应用配置
 	err = initAppConfig()
 	if err != nil {
-		return err
+		panic(fmt.Errorf("init config fail ：  %s \n", err))
 	}
 
 	// 初始化日志处理器
-	appPath := GetString("log.path")
-	if appPath == "" {
-		appPath = DefaultLogPath
-	}
+	appPath := GetDefaultString("log.path", DefaultLogPath)
 	initLoggerPool(loggerConfig{
 		FilePath:   appPath + "/" + appName,
 		MaxSize:    0,
@@ -46,59 +46,53 @@ func InitApp() error {
 		dbList := GetStringMap("mysql")
 		for key := range dbList {
 			if IsSet("mysql." + key) {
-				var conf = new(dbConfig)
+				var conf = new(mysql.Config)
 				if err = config.UnmarshalKey("mysql."+key, &conf); err != nil {
 					panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 				}
-				Mysql[key] = func(conf *dbConfig) *DB {
-					mysql, err := NewMysql().initPool(conf)
+				Mysql[key] = func(conf *mysql.Config) *mysql.DB {
+					conf.Env = GetEnv()
+					imysql, err := mysql.InitOnce(conf).Connect()
 					if err != nil {
-						return nil
+						panic(fmt.Errorf("unable to connect fail ：  %s \n", err))
 					}
-					return mysql
+					return imysql
 				}(conf)
-				fmt.Println("==="+key+"====", *Mysql[key], Mysql[key].DataSourceName())
 			}
 		}
-		//mysqlParams := new(dbConfig)
-		//if err = config.UnmarshalKey("mysql", &mysqlParams); err != nil {
-		//	panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
-		//}
-
 	}
-	//
-	//// redis初始化
-	//if IsSet("redis") {
-	//	redisConfig := GetStringMap("redis")
-	//	Redis, err = redis.New(redisConfig)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
 
-	return nil
-}
-
-func geMySql(conf *dbConfig) *DB {
-	mysql, err := NewMysql().initPool(conf)
-	if err != nil {
-		return nil
+	// redis初始化
+	if IsSet("redis") {
+		var conf = new(redis.Config)
+		if err = config.UnmarshalKey("redis", &conf); err != nil {
+			panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
+		}
+		Redis, err = redis.New(conf)
+		if err != nil {
+			panic(fmt.Errorf("unable to connect fail ：  %s \n", err))
+		}
 	}
-	return mysql
-}
 
-func InitHttpServer() {
-	// init engine
-	Engine = gin.New()
-	registerMiddleware()
-	registerRouter()
+	engine := gin.New()
+	// 初始化上下文
+	engine.Use(TraceContext())
+	// 异常捕获
+	if GetEnv() != DeployEnvDev {
+		engine.Use(HandlerRecovery(true))
+	}
+	// 记录请求日志
+	registerRouter(engine)
 
 	// 是否需要开启pprof
 	prof := GetInt("http.pprof")
 	if prof == 1 {
-		pprof.Register(Engine)
+		pprof.Register(engine)
 	}
 
 	// 数字不要解析成float64
 	binding.EnableDecoderUseNumber = true
+	//注册自定义参数验证
+	binding.Validator = new(validator.DefaultValidator)
+	return engine
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,7 +18,7 @@ var (
 	httpPort int
 )
 
-func StartHttpServer() error {
+func StartupService(engine *gin.Engine) {
 
 	httpHost = GetString("http.host")
 	httpPort = GetInt("http.port")
@@ -29,7 +30,7 @@ func StartHttpServer() error {
 	go func() {
 		fmt.Printf("服务启动，运行模式：%v，版本号：%s，进程号：%d , ip：%s", GetEnv, "1.0.0", os.Getpid(), addr)
 		fmt.Println("")
-		err := Engine.Run(addr)
+		err := engine.Run(addr)
 		if err != nil && errors.Is(err, http.ErrServerClosed) {
 			fmt.Printf("监听HTTP服务: %v", err.Error())
 			ac <- err
@@ -48,5 +49,4 @@ func StartHttpServer() error {
 		atomic.StoreInt32(&state, 0)
 		fmt.Printf("获取到退出信号: %v  pid %d", sig.String(), os.Getpid())
 	}
-	return nil
 }

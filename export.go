@@ -1,11 +1,11 @@
 package gohera
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/metlive/gohera/mysql"
+	"github.com/metlive/gohera/redis"
 )
 
 var (
-	Mysql  = make(map[string]*DB)
-	Engine *gin.Engine
-	//Redis  *redis.Client
+	Mysql = make(map[string]*mysql.DB)
+	Redis *redis.Client
 )
