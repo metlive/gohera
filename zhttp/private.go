@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	TRACE_SPAN_ID        = "x-span-id"
-	TRACE_RPC_ID_DEF     = "0"
+	SPAN_ID              = "x-span-id"
+	SPAN_ID_DEF          = "0"
 	TRACE_CURRENT_RPC_ID = "trace_current_rpc_id"
 )
 
