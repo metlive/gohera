@@ -1,7 +1,6 @@
 package gohera
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"strconv"
@@ -24,10 +23,8 @@ func TraceContext() gin.HandlerFunc {
 		if spanID == "" {
 			spanID = "1"
 		} else {
-			fmt.Println(len(strings.Split(spanID, ".")))
-			fmt.Println(strings.SplitAfterN(spanID, ".", len(strings.Split(spanID, "."))))
-			indexArr := strings.SplitAfterN(spanID, ".", len(strings.Split(spanID, ".")))
-			index, _ := strconv.Atoi(indexArr[0])
+			indexArr := strings.Split(spanID, ".")
+			index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
 			spanID = spanID + "." + strconv.Itoa(index+1)
 		}
 		userId := c.GetInt(UserId)

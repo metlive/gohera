@@ -85,7 +85,7 @@ func InitApp() (router *gin.Engine) {
 	registerRouter(engine)
 
 	// 是否需要开启pprof
-	prof := GetInt("http.pprof")
+	prof := GetInt("zhttp.pprof")
 	if prof == 1 {
 		pprof.Register(engine)
 	}

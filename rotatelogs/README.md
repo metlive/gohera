@@ -13,7 +13,7 @@ of [File::RotateLogs](https://metacpan.org/release/File-RotateLogs) from Perl to
 ```go
 import (
 "log"
-"net/http"
+"net/zhttp"
 
 apachelog "github.com/lestrrat-go/apache-logformat"
 rotatelogs "github.com/lestrrat-go/file-rotatelogs"
@@ -35,7 +35,7 @@ return
 }
 
 // Now you must write to logf. apache-logformat library can create
-// a http.Handler that only writes the approriate logs for the request
+// a zhttp.Handler that only writes the approriate logs for the request
 // to the given handle
 http.ListenAndServe(":8080", apachelog.CombinedLog.Wrap(mux, logf))
 }
