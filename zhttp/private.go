@@ -3,6 +3,7 @@ package zhttp
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,9 +16,9 @@ import (
 )
 
 const (
-	SPAN_ID              = "x-span-id"
-	SPAN_ID_DEF          = "0"
-	TRACE_CURRENT_RPC_ID = "trace_current_rpc_id"
+	SpanId             = "x-span-id"
+	SpanIdDef          = "0"
+	TraceCurrentSpanId = "trace_current_rpc_id"
 )
 
 // 设置链路追踪,trace_id相关
@@ -26,6 +27,7 @@ func (h *HTTPRequest) setTrace(ctx *gin.Context) *HTTPRequest {
 		return h
 	}
 	prefixHeaders := ctx.Value("header")
+	fmt.Printf("=============== %v", prefixHeaders)
 	if prefixHeaders == nil {
 		return h
 	}
@@ -36,12 +38,12 @@ func (h *HTTPRequest) setTrace(ctx *gin.Context) *HTTPRequest {
 	for k, v := range headers {
 		if v1, ok := v.(string); ok {
 			h.Request.Header.Set(k, v1)
-			if strings.ToUpper(TRACE_SPAN_ID) == strings.ToUpper(k) {
-				ctx.Set(TRACE_SPAN_ID, v1)
+			if strings.ToUpper(SpanId) == strings.ToUpper(k) {
+				ctx.Set(SpanId, v1)
 			}
 		}
 	}
-
+	fmt.Println(h.Request.Header)
 	return h
 }
 
@@ -50,42 +52,36 @@ func (h *HTTPRequest) setNextRpcId(ctx *gin.Context) *HTTPRequest {
 	if ctx == nil {
 		return h
 	}
-	rpcId := ctx.Value(TRACE_SPAN_ID)
+	rpcId := ctx.Value(SpanId)
 	if rpcId == nil {
-		h.Request.Header.Set(TRACE_SPAN_ID, TRACE_RPC_ID_DEF)
+		h.Request.Header.Set(SpanId, SpanIdDef)
 		return h
 	}
 	rpcIds, ok := rpcId.(string)
 	if !ok {
-		h.Request.Header.Set(TRACE_SPAN_ID, TRACE_RPC_ID_DEF)
+		h.Request.Header.Set(SpanId, SpanIdDef)
 		return h
 	}
-	cid := ctx.Value(TRACE_CURRENT_RPC_ID)
+	cid := ctx.Value(TraceCurrentSpanId)
 	cidInt, ok := cid.(int64)
 	if !ok {
 		cidInt = 1
 	}
 	rpcIds = rpcIds + "." + strconv.FormatInt(cidInt, 10)
 	atomic.AddInt64(&cidInt, 1)
-	ctx.Set(TRACE_CURRENT_RPC_ID, cidInt)
-
-	h.Request.Header.Set(TRACE_SPAN_ID, rpcIds)
-
+	ctx.Set(TraceCurrentSpanId, cidInt)
+	h.Request.Header.Set(SpanId, rpcIds)
+	fmt.Println(h.Request.Header)
 	return h
-}
-
-// 自定义Transport,后续可扩展
-func (h *HTTPRequest) getTransport() http.RoundTripper {
-	if h.transport == nil {
-		return http.DefaultTransport
-	}
-
-	return h.transport
 }
 
 // 组装http Client
 func (h *HTTPRequest) packClient() *http.Client {
-	h.Client.Transport = h.getTransport()
+	if h.transport == nil {
+		h.Client.Transport = http.DefaultTransport
+	} else {
+		h.Client.Transport = h.transport
+	}
 	h.Client.Timeout = h.Timeout
 	return h.Client
 }
@@ -107,7 +103,13 @@ func (h *HTTPRequest) doRequest(method, reqUrl string) *HTTPRespone {
 		response.error = err
 		return response
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			response.error = err
+			return
+		}
+	}(resp.Body)
 	var reader io.Reader
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		reader, err = gzip.NewReader(resp.Body)

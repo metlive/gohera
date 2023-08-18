@@ -20,10 +20,10 @@ var (
 
 func StartupService(engine *gin.Engine) {
 
-	httpHost = GetString("zhttp.host")
-	httpPort = GetInt("zhttp.port")
+	httpHost = GetString("http.host")
+	httpPort = GetInt("http.port")
 	if httpPort == 0 {
-		panic(errors.New("zhttp host or port is not valid"))
+		panic(errors.New("http host or port is not valid"))
 	}
 	addr := httpHost + ":" + strconv.Itoa(httpPort)
 	ac := make(chan error)

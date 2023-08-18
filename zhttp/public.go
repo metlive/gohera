@@ -51,9 +51,9 @@ func (h *HTTPRequest) GetRespStatus() int {
 	return 0
 }
 
-func (b *HTTPRequest) SetTransport(transport http.RoundTripper) *HTTPRequest {
-	b.transport = transport
-	return b
+func (h *HTTPRequest) SetTransport(transport http.RoundTripper) *HTTPRequest {
+	h.transport = transport
+	return h
 }
 
 // SetTimeOut 主动设置超时时间,默认3秒超时
