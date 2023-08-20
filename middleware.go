@@ -3,7 +3,6 @@ package gohera
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"strconv"
 	"strings"
 )
 
@@ -22,12 +21,9 @@ func TraceContext() gin.HandlerFunc {
 		}
 		if spanID == "" {
 			spanID = "1"
-		} else {
-			indexArr := strings.Split(spanID, ".")
-			index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
-			spanID = spanID + "." + strconv.Itoa(index+1)
 		}
 		userId := c.GetInt(UserId)
+
 		t := &Trace{
 			TraceId: traceID,
 			SpanId:  spanID,
@@ -35,6 +31,17 @@ func TraceContext() gin.HandlerFunc {
 			Method:  c.Request.Method,
 			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),
+			Headers: func(headers map[string][]string) map[string]any {
+				prefixHeaders := make(map[string]any)
+				for k, v := range headers {
+					if len(v) == 0 {
+						prefixHeaders[k] = ""
+					} else {
+						prefixHeaders[k] = v[0]
+					}
+				}
+				return prefixHeaders
+			}(c.Request.Header),
 		}
 		c.Set(TraceCtx, t)
 		c.Next()

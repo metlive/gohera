@@ -13,8 +13,10 @@ const (
 )
 
 const (
-	TraceId  = "x-trace-id"
-	SpanId   = "x-span-id"
-	UserId   = "x-user-id"
-	TraceCtx = "trace-ctx"
+	TraceId        = "x-trace-id"
+	SpanId         = "x-span-id"
+	UserId         = "x-user-id"
+	TraceCtx       = "trace-ctx"
+	TraceHeaderCtx = "trace-header-ctx"
+	SpanIdDefault  = "0"
 )

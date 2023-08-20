@@ -19,6 +19,7 @@ type Trace struct {
 	Method  string `json:"method"`
 	Path    string `json:"path"`
 	Status  int    `json:"status"`
+	Headers map[string]any
 }
 
 // Entry 定义统一的日志写入方式
