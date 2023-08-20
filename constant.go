@@ -13,10 +13,11 @@ const (
 )
 
 const (
-	TraceId        = "x-trace-id"
-	SpanId         = "x-span-id"
-	UserId         = "x-user-id"
-	TraceCtx       = "trace-ctx"
-	TraceHeaderCtx = "trace-header-ctx"
-	SpanIdDefault  = "0"
+	TraceId         = "x-trace-id"
+	SpanId          = "x-span-id"
+	UserId          = "x-user-id"
+	TraceCtx        = "trace-ctx"
+	SpanIdDefault   = "0"
+	FormContentType = "application/x-www-form-urlencoded"
+	JsonContentType = "application/json"
 )
