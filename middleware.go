@@ -20,14 +20,12 @@ func TraceContext() gin.HandlerFunc {
 			}
 		}
 		if spanID == "" {
-			spanID = "1"
+			spanID = SpanIdDefault
 		}
-		userId := c.GetInt(UserId)
-
 		t := &Trace{
 			TraceId: traceID,
 			SpanId:  spanID,
-			UserId:  userId,
+			UserId:  c.GetInt(UserId),
 			Method:  c.Request.Method,
 			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),

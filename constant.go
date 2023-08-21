@@ -17,7 +17,7 @@ const (
 	SpanId          = "x-span-id"
 	UserId          = "x-user-id"
 	TraceCtx        = "trace-ctx"
-	SpanIdDefault   = "0"
+	SpanIdDefault   = "1"
 	FormContentType = "application/x-www-form-urlencoded"
 	JsonContentType = "application/json"
 )
