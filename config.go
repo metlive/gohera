@@ -17,7 +17,7 @@ func initAppConfig() error {
 
 	config = viper.New()
 	config.SetConfigName("app")
-	config.AddConfigPath("./conf")
+	config.AddConfigPath("./config")
 	config.SetConfigType("toml")
 
 	err := config.ReadInConfig()
