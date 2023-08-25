@@ -55,14 +55,14 @@ Response {"status": 200, "env": "Development"}
 # Http
 ```cassandraql
 // 路由   
-g := gohera.HttpEngine.Group("/a/b")  
+g := engine.Group("/a/b")  
 g.POST("/c", func)  
 g.GET("/d", func)  
 ```
 针对路由组或某个路由开启中间件拦截
 ```cassandraql
 // 请求日志，默认框架开启请求日志
-Engine.Use(HandleAppAccessLog())
+engine.Use(HandleAppAccessLog())
 ```  
  
 配置开关
@@ -171,20 +171,16 @@ gohera.Redis.Get(key)
 
 # response
 ```go
-// 通用调用
-func RenderJson(c *gin.Context, code int, message string, result interface{}) {
-	c.JSON(http.StatusOK, newHttpResponse(code, message, result))
-}
 // 成功请求调用
-func RenderJsonSuccess(c *gin.Context, result interface{}) {
+func JsonSuccess(c *gin.Context, result interface{}) {
 	c.JSON(http.StatusOK, newHttpResponse(Success, "",  result))
 }
 // 失败请求调用
-func RenderJsonException(c *gin.Context, errCode int) {
+func JsonError(c *gin.Context, errCode int) {
 	c.JSON(http.StatusOK, newHttpResponse(errCode, "", nil))
 }
 // 终止请求
-func AbortJson(c *gin.Context, errCode int, message string) {
+func JsonAbort(c *gin.Context, errCode int, message string) {
 	c.AbortWithStatusJSON(http.StatusInternalServerError, newHttpResponse(errCode, message, nil))
 }
 ```
