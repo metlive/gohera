@@ -59,7 +59,7 @@ func initLoggerPool(config loggerConfig) {
 	// 设置初始化字段
 	filed := zap.Fields(
 		zap.String("type", "go"),
-		zap.String("project", GetAppName()),
+		zap.String("project", GetString("http.host.service")),
 	)
 	core := zapcore.NewTee(cores...)
 	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
@@ -129,7 +129,7 @@ func StartSpan(ctx context.Context, format string, args ...interface{}) (string,
 	if l > 0 {
 		return fmt.Sprintf(format, args[:l]...), getContextFields(ctx)
 	}
-	return format, []zap.Field{}
+	return format, getContextFields(ctx)
 }
 
 func Info(ctx context.Context, args ...any) {
