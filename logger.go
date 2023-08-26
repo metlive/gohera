@@ -59,7 +59,7 @@ func initLoggerPool(config loggerConfig) {
 	// 设置初始化字段
 	filed := zap.Fields(
 		zap.String("type", "go"),
-		zap.String("project", GetString("http.host.service")),
+		zap.String("project", GetString("http.service")),
 	)
 	core := zapcore.NewTee(cores...)
 	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
