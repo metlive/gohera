@@ -16,6 +16,7 @@ require (
 	github.com/spf13/viper v1.16.0
 	go.uber.org/zap v1.24.0
 	xorm.io/xorm v1.3.2
+	github.com/robfig/cron/v3 v3.0.1
 )
 
 require (

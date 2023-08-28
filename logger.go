@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/metlive/gohera/rotatelogs"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -102,7 +104,15 @@ func GetTraceContext(ctx context.Context) *Trace {
 	if ctxValue, ok := ctx.(*gin.Context); ok {
 		return ctxValue.MustGet(TraceCtx).(*Trace)
 	} else {
-		return ctx.Value(TraceCtx).(*Trace)
+		return &Trace{
+			TraceId: strings.ReplaceAll(uuid.NewString(), "-", ""),
+			SpanId:  "1",
+			UserId:  0,
+			Method:  "cron",
+			Path:    "",
+			Status:  0,
+			Headers: nil,
+		}
 	}
 	return new(Trace)
 }
