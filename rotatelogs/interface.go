@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lestrrat-go/strftime"
+	"github.com/metlive/gohera/rotatelogs/strftime"
 )
 
 type Handler interface {

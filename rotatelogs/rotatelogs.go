@@ -2,6 +2,8 @@ package rotatelogs
 
 import (
 	"fmt"
+	"github.com/metlive/gohera/rotatelogs/strftime"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,9 +11,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/lestrrat-go/strftime"
-	"github.com/pkg/errors"
 )
 
 func (c clockFn) Now() time.Time {
