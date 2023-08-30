@@ -31,17 +31,7 @@ func TraceContext() gin.HandlerFunc {
 			Method:  c.Request.Method,
 			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),
-			Headers: func(headers map[string][]string) map[string]any {
-				prefixHeaders := make(map[string]any)
-				for k, v := range headers {
-					if len(v) == 0 {
-						prefixHeaders[k] = ""
-					} else {
-						prefixHeaders[k] = v[0]
-					}
-				}
-				return prefixHeaders
-			}(c.Request.Header),
+			Headers: getHeader(c.Request.Header),
 		}
 		c.Set(TraceCtx, t)
 		c.Next()

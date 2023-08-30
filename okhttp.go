@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -158,7 +159,7 @@ func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	return h
 }
 
-func (h *HTTPRequest) GetCtx(ctx *gin.Context, reqUrl string) *HTTPRespone {
+func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
 	if len(h.params) > 0 {
 		var paramBody string
@@ -222,11 +223,11 @@ func (h *HTTPRequest) setBody(body []byte) *HTTPRequest {
 }
 
 // 自动添加referers
-func (h *HTTPRequest) setReferer(ctx *gin.Context) *HTTPRequest {
+func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
 	appName := os.Getenv("OCEAN_APP")
 	value := ""
-	if ctx != nil && ctx.Request != nil {
-		value = "http://" + ctx.Request.Host + ctx.Request.RequestURI
+	if ctx != nil && h.request != nil {
+		value = "http://" + h.request.Host + h.request.RequestURI
 	} else if appName != "" {
 		value = "http://" + appName + "/cmd"
 	}
@@ -237,26 +238,50 @@ func (h *HTTPRequest) setReferer(ctx *gin.Context) *HTTPRequest {
 }
 
 // 设置链路追踪,trace_id相关
-func (h *HTTPRequest) setTrace(ctx *gin.Context) *HTTPRequest {
-	if ctx == nil {
+func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
+	if cx == nil {
 		return h
 	}
-	var traceInfo *Trace
-	traceInfo = ctx.MustGet(TraceCtx).(*Trace)
-	if traceInfo.SpanId == "" {
-		traceInfo.SpanId = SpanIdDefault
+	var traceInfo = new(Trace)
+	var spanId = SpanIdDefault
+	if ctx, ok := cx.(*gin.Context); ok {
+		traceInfo = ctx.MustGet(TraceCtx).(*Trace)
+		if traceInfo.SpanId == "" {
+			traceInfo.SpanId = SpanIdDefault
+		}
+		indexArr := strings.Split(traceInfo.SpanId, ".")
+		index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
+		spanId = traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
+		ctx.Set(TraceCtx, &Trace{
+			TraceId: traceInfo.TraceId,
+			SpanId:  spanId,
+			UserId:  traceInfo.UserId,
+			Method:  traceInfo.Method,
+			Path:    ctx.Request.URL.Host + ctx.Request.URL.Path,
+			Status:  ctx.Writer.Status(),
+			Headers: getHeader(h.request.Header),
+		})
+	} else {
+		if h.request.Header.Get(SpanId) != "" {
+			traceInfo.SpanId = h.request.Header.Get(SpanId)
+		}
+		if traceInfo.SpanId == "" {
+			traceInfo.SpanId = SpanIdDefault
+		}
+		indexArr := strings.Split(traceInfo.SpanId, ".")
+		index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
+		spanId = traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
+		traceInfo = &Trace{
+			TraceId: strings.ReplaceAll(uuid.NewString(), "-", ""),
+			SpanId:  spanId,
+			UserId:  0,
+			Method:  h.request.Method,
+			Path:    "",
+			Status:  200,
+			Headers: getHeader(h.request.Header),
+		}
+		context.WithValue(cx, TraceCtx, traceInfo)
 	}
-	indexArr := strings.Split(traceInfo.SpanId, ".")
-	index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
-	spanId := traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
-	ctx.Set(TraceCtx, &Trace{
-		TraceId: traceInfo.TraceId,
-		SpanId:  spanId,
-		UserId:  traceInfo.UserId,
-		Method:  traceInfo.Method,
-		Path:    ctx.Request.URL.Host + ctx.Request.URL.Path,
-		Status:  ctx.Writer.Status(),
-	})
 	for k, v := range traceInfo.Headers {
 		if v1, ok := v.(string); ok {
 			h.request.Header.Set(k, v1)
@@ -283,8 +308,6 @@ func (h *HTTPRequest) doRequest(ctx context.Context, method, reqUrl string) *HTT
 		h.client.Transport = h.transport
 	}
 	h.client.Timeout = h.timeout
-	headers, _ := json.Marshal(h.request.Header)
-	Infotf(ctx, "request headers: %v", string(headers))
 	//请求测试次数
 	var resp *http.Response
 	for i := 0; h.retries == -1 || i <= h.retries; i++ {

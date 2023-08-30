@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/metlive/gohera/rotatelogs"
 	"os"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -82,12 +80,12 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 		writer = zapcore.AddSync(logf)
 	}
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-		MessageKey:    "message",
-		LevelKey:      "level",
-		StacktraceKey: "trace",
-		TimeKey:       "time",
-		NameKey:       "logger",
-		CallerKey:     "caller",
+		MessageKey:    "x_message",
+		LevelKey:      "x_level",
+		StacktraceKey: "x_trace",
+		TimeKey:       "x_time",
+		NameKey:       "x_logger",
+		CallerKey:     "x_caller",
 		LineEnding:    zapcore.DefaultLineEnding,
 		EncodeLevel:   zapcore.LowercaseLevelEncoder,
 		EncodeTime: func(t time.Time, encoder zapcore.PrimitiveArrayEncoder) {
@@ -104,15 +102,7 @@ func GetTraceContext(ctx context.Context) *Trace {
 	if ctxValue, ok := ctx.(*gin.Context); ok {
 		return ctxValue.MustGet(TraceCtx).(*Trace)
 	} else {
-		return &Trace{
-			TraceId: strings.ReplaceAll(uuid.NewString(), "-", ""),
-			SpanId:  "1",
-			UserId:  0,
-			Method:  "cron",
-			Path:    "",
-			Status:  0,
-			Headers: nil,
-		}
+		return ctx.Value(TraceCtx).(*Trace)
 	}
 	return new(Trace)
 }
@@ -124,11 +114,12 @@ func getContextFields(ctx context.Context) []zap.Field {
 	}
 	zapFiled := make([]zap.Field, 0)
 	traceInfo := GetTraceContext(ctx)
-	zapFiled = append(zapFiled, zap.String("trace_id", traceInfo.TraceId))
-	zapFiled = append(zapFiled, zap.String("span_id", traceInfo.SpanId))
-	zapFiled = append(zapFiled, zap.Int("user_id", traceInfo.UserId))
-	zapFiled = append(zapFiled, zap.String("path", traceInfo.Path))
-	zapFiled = append(zapFiled, zap.Int("status", traceInfo.Status))
+	zapFiled = append(zapFiled, zap.String("x_trace_id", traceInfo.TraceId))
+	zapFiled = append(zapFiled, zap.String("x_span_id", traceInfo.SpanId))
+	zapFiled = append(zapFiled, zap.Int("x_user_id", traceInfo.UserId))
+	zapFiled = append(zapFiled, zap.String("x_path", traceInfo.Path))
+	zapFiled = append(zapFiled, zap.Int("x_status", traceInfo.Status))
+	zapFiled = append(zapFiled, zap.Any("x_header", traceInfo.Headers))
 	return zapFiled
 }
 
