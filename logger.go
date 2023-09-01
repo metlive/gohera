@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/metlive/gohera/rotatelogs"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -117,7 +119,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 	}
 	zapFiled := make([]zap.Field, 0)
 	traceInfo := GetTraceContext(ctx)
-	zapFiled = append(zapFiled, zap.String("x_trace_id", Ternary[string](traceInfo.TraceId == "", "3434", traceInfo.TraceId)))
+	zapFiled = append(zapFiled, zap.String("x_trace_id", Ternary[string](traceInfo.TraceId == "", strings.ReplaceAll(uuid.NewString(), "-", ""), traceInfo.TraceId)))
 	zapFiled = append(zapFiled, zap.String("x_span_id", Ternary[string](traceInfo.SpanId == "", SpanIdDefault, traceInfo.SpanId)))
 	zapFiled = append(zapFiled, zap.Int("x_user_id", Ternary[int](traceInfo.UserId == 0, 0, traceInfo.UserId)))
 	zapFiled = append(zapFiled, zap.String("x_path", traceInfo.Path))
