@@ -22,7 +22,7 @@ type Trace struct {
 	Headers map[string]any
 }
 
-// Entry 定义统一的日志写入方式
+// 定义统一的日志写入方式
 var logger *zap.Logger
 
 type loggerConfig struct {
@@ -102,7 +102,10 @@ func GetTraceContext(ctx context.Context) *Trace {
 	if ctxValue, ok := ctx.(*gin.Context); ok {
 		return ctxValue.MustGet(TraceCtx).(*Trace)
 	} else {
-		return ctx.Value(TraceCtx).(*Trace)
+		trace := ctx.Value(TraceCtx)
+		if trace != nil {
+			return trace.(*Trace)
+		}
 	}
 	return new(Trace)
 }
@@ -114,9 +117,9 @@ func getContextFields(ctx context.Context) []zap.Field {
 	}
 	zapFiled := make([]zap.Field, 0)
 	traceInfo := GetTraceContext(ctx)
-	zapFiled = append(zapFiled, zap.String("x_trace_id", traceInfo.TraceId))
-	zapFiled = append(zapFiled, zap.String("x_span_id", traceInfo.SpanId))
-	zapFiled = append(zapFiled, zap.Int("x_user_id", traceInfo.UserId))
+	zapFiled = append(zapFiled, zap.String("x_trace_id", Ternary[string](traceInfo.TraceId == "", "3434", traceInfo.TraceId)))
+	zapFiled = append(zapFiled, zap.String("x_span_id", Ternary[string](traceInfo.SpanId == "", SpanIdDefault, traceInfo.SpanId)))
+	zapFiled = append(zapFiled, zap.Int("x_user_id", Ternary[int](traceInfo.UserId == 0, 0, traceInfo.UserId)))
 	zapFiled = append(zapFiled, zap.String("x_path", traceInfo.Path))
 	zapFiled = append(zapFiled, zap.Int("x_status", traceInfo.Status))
 	zapFiled = append(zapFiled, zap.Any("x_header", traceInfo.Headers))
