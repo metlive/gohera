@@ -239,12 +239,9 @@ func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
 
 // 设置链路追踪,trace_id相关
 func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
-	if cx == nil {
-		return h
-	}
 	var traceInfo = new(Trace)
 	var spanId = SpanIdDefault
-	if ctx, ok := cx.(*gin.Context); ok {
+	if ctx, ok := cx.(*gin.Context); ok && cx != nil {
 		traceInfo = ctx.MustGet(TraceCtx).(*Trace)
 		if traceInfo.SpanId == "" {
 			traceInfo.SpanId = SpanIdDefault

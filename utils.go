@@ -18,7 +18,7 @@ func Contains[T comparable](needle T, hystack []T) bool {
 	return false
 }
 
-func IsMap[K comparable, V any](needle K, hystack map[K]V) bool {
+func Map[K comparable, V any](needle K, hystack map[K]V) bool {
 	if _, ok := hystack[needle]; ok {
 		return true
 	}
