@@ -27,6 +27,7 @@ type HTTPRequest struct {
 	ctx       context.Context
 	retries   int
 	params    map[string][]string
+	url       string
 }
 
 type HTTPRespone struct {
@@ -148,6 +149,11 @@ func (h *HTTPRequest) SetRetries(times int) *HTTPRequest {
 	return h
 }
 
+func (h *HTTPRequest) SetUrl(url string) *HTTPRequest {
+	h.url = url
+	return h
+}
+
 // Param adds query param in to schema.
 // params build query string as ?key1=value1&key2=value2...
 func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
@@ -180,27 +186,33 @@ func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 			reqUrl = reqUrl + "?" + paramBody
 		}
 	}
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(ctx, http.MethodGet, reqUrl)
+	h.SetUrl(reqUrl)
+	h.ctx = ctx
+	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodGet, reqUrl)
 	return resp
 }
 
-func (h *HTTPRequest) DeleteCtx(ctx *gin.Context, reqUrl string) *HTTPRespone {
+func (h *HTTPRequest) DeleteCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(ctx, http.MethodDelete, reqUrl)
+	h.SetUrl(reqUrl)
+	h.ctx = ctx
+	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodDelete, reqUrl)
 	return resp
 }
 
-func (h *HTTPRequest) PostFormCtx(ctx *gin.Context, reqUrl string, params map[string]any) *HTTPRespone {
+func (h *HTTPRequest) PostFormCtx(ctx context.Context, reqUrl string, params map[string]any) *HTTPRespone {
 	args := &url.Values{}
 	for key, value := range params {
 		args.Add(key, fmt.Sprintf("%v", value))
 	}
 	h.request.Header.Set("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).setBody([]byte(args.Encode())).doRequest(ctx, http.MethodPost, reqUrl)
+	h.SetUrl(reqUrl)
+	h.ctx = ctx
+	resp := h.setTrace(ctx).setReferer(ctx).setBody([]byte(args.Encode())).doRequest(http.MethodPost, reqUrl)
 	return resp
 }
 
-func (h *HTTPRequest) PostJsonCtx(ctx *gin.Context, reqUrl string, params any) *HTTPRespone {
+func (h *HTTPRequest) PostJsonCtx(ctx context.Context, reqUrl string, params any) *HTTPRespone {
 	h.request.Header.Set("Content-Type", JsonContentType)
 	requestBody, err := json.Marshal(params)
 	resp := &HTTPRespone{}
@@ -208,7 +220,9 @@ func (h *HTTPRequest) PostJsonCtx(ctx *gin.Context, reqUrl string, params any) *
 		resp.error = errors.New("json marshal fail")
 		return resp
 	}
-	resp = h.setTrace(ctx).setReferer(ctx).setBody(requestBody).doRequest(ctx, http.MethodPost, reqUrl)
+	h.SetUrl(reqUrl)
+	h.ctx = ctx
+	resp = h.setTrace(ctx).setReferer(ctx).setBody(requestBody).doRequest(http.MethodPost, reqUrl)
 	return resp
 }
 
@@ -239,6 +253,10 @@ func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
 
 // 设置链路追踪,trace_id相关
 func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
+	fmt.Println(cx)
+	if cx == nil {
+		cx = context.Background()
+	}
 	var traceInfo = new(Trace)
 	var spanId = SpanIdDefault
 	if ctx, ok := cx.(*gin.Context); ok && cx != nil {
@@ -273,7 +291,7 @@ func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
 			SpanId:  spanId,
 			UserId:  0,
 			Method:  h.request.Method,
-			Path:    "",
+			Path:    h.url,
 			Status:  200,
 			Headers: getHeader(h.request.Header),
 		}
@@ -289,10 +307,10 @@ func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
 }
 
 // 发起http请求,获取响应并设置对应的值
-func (h *HTTPRequest) doRequest(ctx context.Context, method, reqUrl string) *HTTPRespone {
+func (h *HTTPRequest) doRequest(method, reqUrl string) *HTTPRespone {
 	h.request.Method = method
 	u, err := url.Parse(reqUrl)
-	Infotf(ctx, "request %v: %v", method, u)
+	Infotf(h.ctx, "request %v: %v", method, u)
 	response := &HTTPRespone{}
 	if err != nil {
 		response.error = err
