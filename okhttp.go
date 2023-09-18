@@ -241,7 +241,6 @@ func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
 
 // 设置链路追踪,trace_id相关
 func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
-	fmt.Println(cx)
 	if cx == nil {
 		cx = context.Background()
 	}
