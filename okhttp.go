@@ -181,13 +181,13 @@ func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 			reqUrl = reqUrl + "?" + paramBody
 		}
 	}
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(ctx, http.MethodGet, reqUrl)
+	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodGet, reqUrl)
 	return resp
 }
 
 func (h *HTTPRequest) DeleteCtx(ctx *gin.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(ctx, http.MethodDelete, reqUrl)
+	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodDelete, reqUrl)
 	return resp
 }
 
@@ -197,7 +197,7 @@ func (h *HTTPRequest) PostFormCtx(ctx *gin.Context, reqUrl string, params map[st
 		args.Add(key, fmt.Sprintf("%v", value))
 	}
 	h.request.Header.Set("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).setBody([]byte(args.Encode())).doRequest(ctx, http.MethodPost, reqUrl)
+	resp := h.setTrace(ctx).setReferer(ctx).setBody([]byte(args.Encode())).doRequest(http.MethodPost, reqUrl)
 	return resp
 }
 
@@ -209,7 +209,7 @@ func (h *HTTPRequest) PostJsonCtx(ctx *gin.Context, reqUrl string, params any) *
 		resp.error = errors.New("json marshal fail")
 		return resp
 	}
-	resp = h.setTrace(ctx).setReferer(ctx).setBody(requestBody).doRequest(ctx, http.MethodPost, reqUrl)
+	resp = h.setTrace(ctx).setReferer(ctx).setBody(requestBody).doRequest(http.MethodPost, reqUrl)
 	return resp
 }
 
