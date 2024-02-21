@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +14,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type HTTPRequest struct {
@@ -45,6 +46,7 @@ func NewRequest() *HTTPRequest {
 		request: &http.Request{
 			Header: make(http.Header),
 		},
+
 		params:  make(map[string][]string),
 		timeout: 3 * time.Second,
 		retries: 1,
@@ -99,7 +101,6 @@ func (h *HTTPRequest) SetHeaders(header map[string]string) *HTTPRequest {
 			h.request.Header.Set(k, v)
 		}
 	}
-
 	return h
 }
 
@@ -244,8 +245,8 @@ func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
 	if cx == nil {
 		cx = context.Background()
 	}
-	var traceInfo = new(Trace)
-	var spanId = SpanIdDefault
+	traceInfo := new(Trace)
+	spanId := SpanIdDefault
 	if ctx, ok := cx.(*gin.Context); ok {
 		traceInfo = ctx.MustGet(TraceCtx).(*Trace)
 		if traceInfo.SpanId == "" {
@@ -310,7 +311,7 @@ func (h *HTTPRequest) doRequest(method, reqUrl string) *HTTPRespone {
 		h.client.Transport = h.transport
 	}
 	h.client.Timeout = h.timeout
-	//请求测试次数
+	// 请求测试次数
 	var resp *http.Response
 	for i := 0; h.retries == -1 || i <= h.retries; i++ {
 		resp, err = h.client.Do(h.request)

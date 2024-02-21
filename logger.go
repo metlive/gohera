@@ -3,13 +3,13 @@ package gohera
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/metlive/gohera/rotatelogs"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/metlive/gohera/rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -32,7 +32,7 @@ type loggerConfig struct {
 	MaxSize    int    `json:"max_size"`
 	MaxBackups int    `json:"max_backups"`
 	Compress   bool   `json:"compress"`
-	Mode       string `json:"mode"` //环境
+	Mode       string `json:"mode"` // 环境
 }
 
 func initLoggerPool(config loggerConfig) {
@@ -130,7 +130,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 
 // 判断其他类型--start
 func StartSpan(ctx context.Context, format string, args ...interface{}) (string, []zap.Field) {
-	//判断是否有context
+	// 判断是否有context
 	l := len(args)
 	if l > 0 {
 		return fmt.Sprintf(format, args[:l]...), getContextFields(ctx)
