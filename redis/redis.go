@@ -12,8 +12,6 @@ const (
 	DefaultConnTimeout  = 2 * time.Second
 	DefaultReadTimeout  = 2 * time.Second
 	DefaultWriteTimeout = 2 * time.Second
-	DefaultMaxIdle      = 10
-	DefaultMaxActive    = 10
 )
 
 type Client struct {

@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -161,6 +160,11 @@ func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	return h
 }
 
+func (h *HTTPRequest) Get(reqUrl string) *HTTPRespone {
+	ctx := context.Background()
+	return h.GetCtx(ctx, reqUrl)
+}
+
 func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
 	if len(h.params) > 0 {
@@ -226,12 +230,12 @@ func (h *HTTPRequest) setBody(body []byte) *HTTPRequest {
 
 // 自动添加referers
 func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
-	appName := os.Getenv("OCEAN_APP")
+	appName := GetString("http.service")
 	value := ""
 	if ctx != nil && h.request != nil {
-		value = "http://" + h.request.Host + h.request.RequestURI
+		value = `http://` + h.request.Host + h.request.RequestURI
 	} else if appName != "" {
-		value = "http://" + appName + "/cmd"
+		value = `http://` + appName + "/cmd"
 	}
 	if value != "" {
 		h.request.Header.Add("referer", value)
