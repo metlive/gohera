@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/metlive/gohera/rotatelogs"
 	"go.uber.org/zap"
@@ -101,12 +100,13 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 
 // 从上下文中获取跟踪ID
 func GetTraceContext(ctx context.Context) *Trace {
-	if ctxValue, ok := ctx.(*gin.Context); ok {
-		return ctxValue.MustGet(TraceCtx).(*Trace)
-	} else {
-		trace := ctx.Value(TraceCtx)
-		if trace != nil {
-			return trace.(*Trace)
+	if ctx == nil {
+		return new(Trace)
+	}
+	// 尝试从标准 context.Value 获取 (兼容 Gin Context 和 request.Context())
+	if v := ctx.Value(TraceCtx); v != nil {
+		if t, ok := v.(*Trace); ok {
+			return t
 		}
 	}
 	return new(Trace)
@@ -117,7 +117,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	zapFiled := make([]zap.Field, 0)
+	zapFiled := make([]zap.Field, 0, 6)
 	traceInfo := GetTraceContext(ctx)
 	zapFiled = append(zapFiled, zap.String("x_trace_id", Ternary[string](traceInfo.TraceId == "", strings.ReplaceAll(uuid.NewString(), "-", ""), traceInfo.TraceId)))
 	zapFiled = append(zapFiled, zap.String("x_span_id", Ternary[string](traceInfo.SpanId == "", SpanIdDefault, traceInfo.SpanId)))

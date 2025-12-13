@@ -2,10 +2,11 @@ package gohera
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func TraceContext() gin.HandlerFunc {
@@ -34,6 +35,9 @@ func TraceContext() gin.HandlerFunc {
 			Headers: getHeader(c.Request.Header),
 		}
 		c.Set(TraceCtx, t)
+		// 将 Trace 信息注入到 Request 的 Context 中，以便在非 Gin 环境下（如 Service 层）也能获取
+		ctx := context.WithValue(c.Request.Context(), TraceCtx, t)
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }
@@ -45,7 +49,7 @@ func CorsContext() gin.HandlerFunc {
 		for k := range c.Request.Header {
 			headerKeys = append(headerKeys, k)
 		}
-		//跨域自定义header ，不设置自动加入，在下面手动设置
+		// 跨域自定义header ，不设置自动加入，在下面手动设置
 		cosHeader := c.GetHeader("Access-Control-Request-Headers")
 		cosHeaders := strings.Split(cosHeader, ",")
 		headerKeys = append(headerKeys, cosHeaders...)
@@ -64,17 +68,15 @@ func CorsContext() gin.HandlerFunc {
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
-		//放行所有OPTIONS方法
+		// 放行所有OPTIONS方法
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatusJSON(http.StatusNoContent, "WeclassRoom Request Options")
 		}
 		c.Next()
 	}
-
 }
 
 func RecoveryContext() gin.HandlerFunc {
 	return func(context *gin.Context) {
-
 	}
 }
