@@ -1,6 +1,7 @@
 package gohera
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"

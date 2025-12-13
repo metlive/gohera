@@ -132,6 +132,16 @@ path = "/var/log/trace"
 * 日志按天自动分割
 * 日志文件名采用{appPath} + "/" + {appName} + "_%Y%m%d.log"
 
+// 在函数入口处初始化一次
+log := gohera.Ctx(ctx)
+
+// 后续调用直接打印，无需传 ctx
+log.Info("user logged in")
+log.Infotf("user %s logged in", username)
+
+log.Error("database error")
+log.Errortf("failed to query db: %v", err)
+
 # Mysql ORM
 
 ```cassandraql

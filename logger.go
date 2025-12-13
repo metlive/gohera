@@ -167,3 +167,36 @@ func Errortf(ctx context.Context, template string, args ...any) {
 	str, filed := StartSpan(ctx, template, args...)
 	logger.Error(str, filed...)
 }
+
+type ContextLogger struct {
+	ctx context.Context
+}
+
+// Ctx creates a new ContextLogger that binds the given context.
+func Ctx(ctx context.Context) *ContextLogger {
+	return &ContextLogger{ctx: ctx}
+}
+
+func (l *ContextLogger) Info(args ...any) {
+	Info(l.ctx, args...)
+}
+
+func (l *ContextLogger) Infotf(template string, args ...any) {
+	Infotf(l.ctx, template, args...)
+}
+
+func (l *ContextLogger) Warn(args ...any) {
+	Warn(l.ctx, args...)
+}
+
+func (l *ContextLogger) Warntf(template string, args ...any) {
+	Warntf(l.ctx, template, args...)
+}
+
+func (l *ContextLogger) Error(args ...any) {
+	Error(l.ctx, args...)
+}
+
+func (l *ContextLogger) Errortf(template string, args ...any) {
+	Errortf(l.ctx, template, args...)
+}
