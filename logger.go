@@ -51,22 +51,59 @@ func initLoggerPool(config loggerConfig) {
 	errorPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
 		return lev >= zap.ErrorLevel
 	})
+	
+	// 文件输出 Core (保持 JSON 格式)
 	cores := []zapcore.Core{
 		getEncoderCore(fmt.Sprintf("./%s/server_debug.log", config.FilePath), debugPriority, config),
 		getEncoderCore(fmt.Sprintf("./%s/server_info.log", config.FilePath), infoPriority, config),
 		getEncoderCore(fmt.Sprintf("./%s/server_warn.log", config.FilePath), warnPriority, config),
 		getEncoderCore(fmt.Sprintf("./%s/server_error.log", config.FilePath), errorPriority, config),
 	}
-	// 设置初始化字段
+
+	// 新增：非正式环境添加控制台输出 (无格式纯文本)
+	if config.Mode != "pro" {
+		// 使用 zap.DebugLevel 允许输出 Debug 及以上所有级别日志
+		cores = append(cores, getConsoleCore(zap.DebugLevel))
+	}
+
 	filed := zap.Fields(
-		zap.String("type", "go"),
-		zap.String("project", GetString("http.service")),
+		zap.String("x_type", "go"),
+		zap.String("x_project", GetString("http.service")),
 	)
 	core := zapcore.NewTee(cores...)
 	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
 }
 
-// getEncoderCore 获取Encoder的zapcore.Core
+// 新增：获取控制台输出 Core (极简格式)
+func getConsoleCore(level zapcore.LevelEnabler) zapcore.Core {
+	core := zapcore.NewCore(zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
+		MessageKey: "msg", // 仅保留消息内容，留空其他 Key 以隐藏时间、级别等
+	}), zapcore.AddSync(os.Stdout), level)
+
+	// 返回一个 cleanConsoleCore 实例，用于精简控制台日志输出（忽略添加的字段，只输出 msg 字段的内容）
+	return &cleanConsoleCore{Core: core}
+}
+
+type cleanConsoleCore struct {
+	zapcore.Core
+}
+
+func (c *cleanConsoleCore) With(fields []zapcore.Field) zapcore.Core {
+	return c // Ignore fields added via With
+}
+
+func (c *cleanConsoleCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(ent.Level) {
+		return ce.AddCore(ent, c)
+	}
+	return ce
+}
+
+func (c *cleanConsoleCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	return c.Core.Write(ent, nil) // Ignore fields during Write
+}
+
+// 修改：getEncoderCore 仅负责文件写入 (移除 os.Stdout)
 func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
 	// 每小时一个文件
 	logf, _ := rotatelogs.New(fileName+"_%Y-%m-%d",
@@ -74,12 +111,10 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 		rotatelogs.WithMaxAge(7*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),
 	)
-	var writer zapcore.WriteSyncer
-	if config.Mode != "pro" {
-		writer = zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(logf))
-	} else {
-		writer = zapcore.AddSync(logf)
-	}
+	
+	// 修改处：不再包含 os.Stdout，只写入文件
+	writer := zapcore.AddSync(logf)
+
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zapcore.EncoderConfig{
 		MessageKey:    "x_message",
 		LevelKey:      "x_level",
