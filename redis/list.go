@@ -2,16 +2,16 @@ package redis
 
 // 列表命令
 
-func (r *Client) LPush(key string, values ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(values)+1)
+func (r *Client) LPush(key string, values ...any) (int, error) {
+	args := make([]any, 0, len(values)+1)
 	args = append(args, key)
 	args = append(args, values...)
 
 	return r.int("LPUSH", args...)
 }
 
-func (r *Client) RPush(key string, values ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(values)+1)
+func (r *Client) RPush(key string, values ...any) (int, error) {
+	args := make([]any, 0, len(values)+1)
 	args = append(args, key)
 	args = append(args, values...)
 

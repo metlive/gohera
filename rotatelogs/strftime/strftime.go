@@ -1,11 +1,12 @@
 package strftime
 
 import (
-	"github.com/pkg/errors"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type compileHandler interface {
@@ -71,7 +72,7 @@ func compile(handler compileHandler, p string, ds SpecificationSet) error {
 }
 
 func getSpecificationSetFor(options ...Option) (SpecificationSet, error) {
-	var ds = defaultSpecificationSet
+	ds := defaultSpecificationSet
 	var extraSpecifications []*optSpecificationPair
 	for _, option := range options {
 		switch option.Name() {
@@ -98,7 +99,7 @@ func getSpecificationSetFor(options ...Option) (SpecificationSet, error) {
 }
 
 var fmtAppendExecutorPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		var h appenderExecutor
 		h.dst = make([]byte, 0, 32)
 		return &h

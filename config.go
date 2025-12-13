@@ -6,9 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	config *viper.Viper
-)
+var config *viper.Viper
 
 func initAppConfig() error {
 	if config != nil {
@@ -27,7 +25,7 @@ func initAppConfig() error {
 	return nil
 }
 
-func GetConfig(key string) interface{} {
+func GetConfig(key string) any {
 	return config.Get(key)
 }
 
@@ -102,6 +100,6 @@ func IsSet(key string) bool {
 	return config.IsSet(key)
 }
 
-func UnmarshalKey(key string, rawVal interface{}) error {
+func UnmarshalKey(key string, rawVal any) error {
 	return config.UnmarshalKey(key, rawVal)
 }

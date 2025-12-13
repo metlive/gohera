@@ -9,7 +9,7 @@ func (r *Client) ZAdd(key string, scores []int, members []string) (int, error) {
 		return 0, errors.New("param error")
 	}
 
-	args := make([]interface{}, 0, len(scores)*2+1)
+	args := make([]any, 0, len(scores)*2+1)
 	args = append(args, key)
 	for i, score := range scores {
 		args = append(args, score)
@@ -32,7 +32,7 @@ func (r *Client) ZIncrBy(key, member string, increment int) (int64, error) {
 }
 
 func (r *Client) ZRange(key string, start, stop int, withScores bool) ([]string, error) {
-	var args []interface{}
+	args := make([]any, 0, 4)
 	args = append(args, key)
 	args = append(args, start)
 	args = append(args, stop)
@@ -44,7 +44,7 @@ func (r *Client) ZRange(key string, start, stop int, withScores bool) ([]string,
 }
 
 func (r *Client) ZRangeByScore(key string, min, max int, withScores bool) ([]string, error) {
-	var args []interface{}
+	args := make([]any, 0, 4)
 	args = append(args, key)
 	args = append(args, min)
 	args = append(args, max)
@@ -59,8 +59,8 @@ func (r *Client) ZRank(key, member string) (int, error) {
 	return r.int("ZRANK", key, member)
 }
 
-func (r *Client) ZRem(key string, members ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(members)+1)
+func (r *Client) ZRem(key string, members ...any) (int, error) {
+	args := make([]any, 0, len(members)+1)
 	args = append(args, key)
 	args = append(args, members...)
 
@@ -76,7 +76,7 @@ func (r *Client) ZRemRangeByScore(key string, min, max int) (int, error) {
 }
 
 func (r *Client) ZRevRange(key string, start, stop int, withScores bool) ([]string, error) {
-	var args []interface{}
+	args := make([]any, 0, 4)
 	args = append(args, key)
 	args = append(args, start)
 	args = append(args, stop)
@@ -88,7 +88,7 @@ func (r *Client) ZRevRange(key string, start, stop int, withScores bool) ([]stri
 }
 
 func (r *Client) ZRevRangeByScore(key string, max, min int, withScores bool) ([]string, error) {
-	var args []interface{}
+	args := make([]any, 0, 4)
 	args = append(args, key)
 	args = append(args, max)
 	args = append(args, min)

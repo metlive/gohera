@@ -1,21 +1,21 @@
 module github.com/metlive/gohera
 
-go 1.20
+go 1.25.5
 
 require (
 	github.com/gin-contrib/pprof v1.4.0
-	github.com/gin-gonic/gin v1.9.1
+	github.com/gin-gonic/gin v1.11.0
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
-	github.com/go-playground/validator/v10 v10.14.0
-	github.com/go-sql-driver/mysql v1.7.1
-	github.com/gomodule/redigo v1.8.9
-	github.com/google/uuid v1.3.0
+	github.com/go-playground/validator/v10 v10.29.0
+	github.com/go-sql-driver/mysql v1.9.3
+	github.com/gomodule/redigo v1.9.3
+	github.com/google/uuid v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/spf13/viper v1.16.0
-	go.uber.org/zap v1.24.0
-	xorm.io/xorm v1.3.2
+	github.com/spf13/viper v1.21.0
+	go.uber.org/zap v1.27.1
+	xorm.io/xorm v1.3.11
 )
 
 require (

@@ -129,7 +129,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 }
 
 // 判断其他类型--start
-func StartSpan(ctx context.Context, format string, args ...interface{}) (string, []zap.Field) {
+func StartSpan(ctx context.Context, format string, args ...any) (string, []zap.Field) {
 	// 判断是否有context
 	l := len(args)
 	if l > 0 {

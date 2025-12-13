@@ -2,16 +2,16 @@ package strftime
 
 type Option interface {
 	Name() string
-	Value() interface{}
+	Value() any
 }
 
 type option struct {
 	name  string
-	value interface{}
+	value any
 }
 
-func (o *option) Name() string       { return o.name }
-func (o *option) Value() interface{} { return o.value }
+func (o *option) Name() string { return o.name }
+func (o *option) Value() any   { return o.value }
 
 const optSpecificationSet = `opt-specification-set`
 

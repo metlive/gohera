@@ -1,5 +1,7 @@
 package gohera
 
+import "slices"
+
 // 三目运算的函数
 func Ternary[T any](a bool, b, c T) T {
 	if a {
@@ -10,12 +12,7 @@ func Ternary[T any](a bool, b, c T) T {
 
 // 查找包含
 func Contains[T comparable](needle T, hystack []T) bool {
-	for _, item := range hystack {
-		if needle == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(hystack, needle)
 }
 
 func Map[K comparable, V any](needle K, hystack map[K]V) bool {
@@ -26,7 +23,7 @@ func Map[K comparable, V any](needle K, hystack map[K]V) bool {
 }
 
 func Set[T comparable](array []T) []T {
-	result := make([]T, 0)
+	result := make([]T, 0, len(array))
 	temp := map[T]struct{}{}
 	for _, item := range array {
 		if _, ok := temp[item]; !ok {

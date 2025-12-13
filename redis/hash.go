@@ -22,7 +22,7 @@ func (r *Client) HExists(key string) (map[string]string, error) {
 	return r.stringMap("HEXISTS", key)
 }
 
-func (r *Client) HDel(key string, fields ...interface{}) (int, error) {
+func (r *Client) HDel(key string, fields ...any) (int, error) {
 	return r.int("HDEL", key, fields)
 }
 

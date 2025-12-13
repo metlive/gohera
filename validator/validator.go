@@ -33,7 +33,7 @@ func (r *ErrorValidator) Error() string {
 var _ binding.StructValidator = &DefaultValidator{}
 
 // ValidateStruct 如果接收到的类型是一个结构体或指向结构体的指针，则执行验证。
-func (v *DefaultValidator) ValidateStruct(obj interface{}) error {
+func (v *DefaultValidator) ValidateStruct(obj any) error {
 	if kindOfData(obj) == reflect.Struct {
 
 		v.lazyinit()
@@ -43,7 +43,7 @@ func (v *DefaultValidator) ValidateStruct(obj interface{}) error {
 		if err := v.validate.Struct(obj); err != nil {
 			// 反回中文的第一条错误
 			if errs, ok := err.(validator.ValidationErrors); ok {
-				//return errors.New(errs[0].Translate(v.Trans))
+				// return errors.New(errs[0].Translate(v.Trans))
 				res := &ErrorValidator{
 					Code:       400,
 					Message:    errors.New(errs[0].Translate(v.Trans)).Error(),
@@ -58,7 +58,7 @@ func (v *DefaultValidator) ValidateStruct(obj interface{}) error {
 }
 
 // Engine 返回支持`StructValidator`实现的底层验证引擎
-func (v *DefaultValidator) Engine() interface{} {
+func (v *DefaultValidator) Engine() any {
 	v.lazyinit()
 	return v.validate
 }
@@ -71,7 +71,7 @@ func (v *DefaultValidator) lazyinit() {
 		v.uni = ut.New(zhCn, zhCn)
 		v.Trans, _ = v.uni.GetTranslator("zh")
 
-		//注册一个函数，获取struct tag里自定义的label作为字段名
+		// 注册一个函数，获取struct tag里自定义的label作为字段名
 		_ = zhtranslations.RegisterDefaultTranslations(v.validate, v.Trans)
 
 		v.validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
@@ -82,11 +82,10 @@ func (v *DefaultValidator) lazyinit() {
 		v.validate.RegisterValidation("YYYY-MM-DD", IsYMD)
 		v.validate.RegisterValidation("YYYY-MM-DD HH:mm", IsYMDHM)
 		v.validate.RegisterValidation("YYYY-MM-DD HH:mm:ss", IsYMDHMS)
-
 	})
 }
 
-func kindOfData(data interface{}) reflect.Kind {
+func kindOfData(data any) reflect.Kind {
 	value := reflect.ValueOf(data)
 	valueType := value.Kind()
 

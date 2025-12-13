@@ -2,8 +2,8 @@ package redis
 
 // 集合命令
 
-func (r *Client) SAdd(key string, members ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(members)+1)
+func (r *Client) SAdd(key string, members ...any) (int, error) {
+	args := make([]any, 0, len(members)+1)
 	args = append(args, key)
 	args = append(args, members...)
 
@@ -22,8 +22,8 @@ func (r *Client) SIsMember(key, member string) (int, error) {
 	return r.int("SISMEMBER", key, member)
 }
 
-func (r *Client) SRem(key string, members ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(members)+1)
+func (r *Client) SRem(key string, members ...any) (int, error) {
+	args := make([]any, 0, len(members)+1)
 	args = append(args, key)
 	args = append(args, members...)
 
@@ -42,36 +42,36 @@ func (r *Client) SMove(source, destination, member string) (int, error) {
 	return r.int("SMOVE", source, destination, member)
 }
 
-func (r *Client) SInter(keys ...interface{}) ([]string, error) {
+func (r *Client) SInter(keys ...any) ([]string, error) {
 	return r.strings("SINTER", keys...)
 }
 
-func (r *Client) SInterStore(destination string, keys ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(keys)+1)
+func (r *Client) SInterStore(destination string, keys ...any) (int, error) {
+	args := make([]any, 0, len(keys)+1)
 	args = append(args, destination)
 	args = append(args, keys...)
 
 	return r.int("SINTERSTORE", args...)
 }
 
-func (r *Client) SDiff(keys ...interface{}) ([]string, error) {
+func (r *Client) SDiff(keys ...any) ([]string, error) {
 	return r.strings("SDIFF", keys...)
 }
 
-func (r *Client) SDiffStore(destination string, keys ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(keys)+1)
+func (r *Client) SDiffStore(destination string, keys ...any) (int, error) {
+	args := make([]any, 0, len(keys)+1)
 	args = append(args, destination)
 	args = append(args, keys...)
 
 	return r.int("SDIFFSTORE", args...)
 }
 
-func (r *Client) SUnion(keys ...interface{}) ([]string, error) {
+func (r *Client) SUnion(keys ...any) ([]string, error) {
 	return r.strings("SUNION", keys...)
 }
 
-func (r *Client) SUnionStore(destination string, keys ...interface{}) (int, error) {
-	args := make([]interface{}, 0, len(keys)+1)
+func (r *Client) SUnionStore(destination string, keys ...any) (int, error) {
+	args := make([]any, 0, len(keys)+1)
 	args = append(args, destination)
 	args = append(args, keys...)
 

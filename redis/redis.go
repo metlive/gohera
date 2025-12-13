@@ -76,7 +76,7 @@ func New(cfg *Config) (*Client, error) {
 }
 
 // 返回 int
-func (r *Client) int(cmd string, args ...interface{}) (int, error) {
+func (r *Client) int(cmd string, args ...any) (int, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -90,7 +90,7 @@ func (r *Client) int(cmd string, args ...interface{}) (int, error) {
 }
 
 // 返回 int64
-func (r *Client) int64(cmd string, args ...interface{}) (int64, error) {
+func (r *Client) int64(cmd string, args ...any) (int64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -104,7 +104,7 @@ func (r *Client) int64(cmd string, args ...interface{}) (int64, error) {
 }
 
 // 返回 uint64
-func (r *Client) uint64(cmd string, args ...interface{}) (uint64, error) {
+func (r *Client) uint64(cmd string, args ...any) (uint64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -118,7 +118,7 @@ func (r *Client) uint64(cmd string, args ...interface{}) (uint64, error) {
 }
 
 // 返回 float64
-func (r *Client) float64(cmd string, args ...interface{}) (float64, error) {
+func (r *Client) float64(cmd string, args ...any) (float64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -132,7 +132,7 @@ func (r *Client) float64(cmd string, args ...interface{}) (float64, error) {
 }
 
 // 返回 string
-func (r *Client) string(cmd string, args ...interface{}) (string, error) {
+func (r *Client) string(cmd string, args ...any) (string, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -146,7 +146,7 @@ func (r *Client) string(cmd string, args ...interface{}) (string, error) {
 }
 
 // 返回 bytes
-func (r *Client) bytes(cmd string, args ...interface{}) ([]byte, error) {
+func (r *Client) bytes(cmd string, args ...any) ([]byte, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -160,7 +160,7 @@ func (r *Client) bytes(cmd string, args ...interface{}) ([]byte, error) {
 }
 
 // 返回 bool
-func (r *Client) bool(cmd string, args ...interface{}) (bool, error) {
+func (r *Client) bool(cmd string, args ...any) (bool, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -173,8 +173,8 @@ func (r *Client) bool(cmd string, args ...interface{}) (bool, error) {
 	return v, err
 }
 
-// 返回 []interface{}
-func (r *Client) values(cmd string, args ...interface{}) ([]interface{}, error) {
+// 返回 []any
+func (r *Client) values(cmd string, args ...any) ([]any, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -188,7 +188,7 @@ func (r *Client) values(cmd string, args ...interface{}) ([]interface{}, error) 
 }
 
 // 返回 []float64
-func (r *Client) float64s(cmd string, args ...interface{}) ([]float64, error) {
+func (r *Client) float64s(cmd string, args ...any) ([]float64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -202,7 +202,7 @@ func (r *Client) float64s(cmd string, args ...interface{}) ([]float64, error) {
 }
 
 // 返回 []string
-func (r *Client) strings(cmd string, args ...interface{}) ([]string, error) {
+func (r *Client) strings(cmd string, args ...any) ([]string, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -216,7 +216,7 @@ func (r *Client) strings(cmd string, args ...interface{}) ([]string, error) {
 }
 
 // 返回 [][]byte
-func (r *Client) byteSlices(cmd string, args ...interface{}) ([][]byte, error) {
+func (r *Client) byteSlices(cmd string, args ...any) ([][]byte, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -230,7 +230,7 @@ func (r *Client) byteSlices(cmd string, args ...interface{}) ([][]byte, error) {
 }
 
 // 返回 []int64
-func (r *Client) int64s(cmd string, args ...interface{}) ([]int64, error) {
+func (r *Client) int64s(cmd string, args ...any) ([]int64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -244,7 +244,7 @@ func (r *Client) int64s(cmd string, args ...interface{}) ([]int64, error) {
 }
 
 // 返回 []int
-func (r *Client) ints(cmd string, args ...interface{}) ([]int, error) {
+func (r *Client) ints(cmd string, args ...any) ([]int, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -258,7 +258,7 @@ func (r *Client) ints(cmd string, args ...interface{}) ([]int, error) {
 }
 
 // 返回 map[string]string
-func (r *Client) stringMap(cmd string, args ...interface{}) (map[string]string, error) {
+func (r *Client) stringMap(cmd string, args ...any) (map[string]string, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -272,7 +272,7 @@ func (r *Client) stringMap(cmd string, args ...interface{}) (map[string]string, 
 }
 
 // 返回 map[string]int
-func (r *Client) intMap(cmd string, args ...interface{}) (map[string]int, error) {
+func (r *Client) intMap(cmd string, args ...any) (map[string]int, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -286,7 +286,7 @@ func (r *Client) intMap(cmd string, args ...interface{}) (map[string]int, error)
 }
 
 // 返回 map[string]int64
-func (r *Client) int64Map(cmd string, args ...interface{}) (map[string]int64, error) {
+func (r *Client) int64Map(cmd string, args ...any) (map[string]int64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -300,7 +300,7 @@ func (r *Client) int64Map(cmd string, args ...interface{}) (map[string]int64, er
 }
 
 // 返回 positions
-func (r *Client) positions(cmd string, args ...interface{}) ([]*[2]float64, error) {
+func (r *Client) positions(cmd string, args ...any) ([]*[2]float64, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
