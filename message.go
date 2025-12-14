@@ -18,7 +18,7 @@ func init() {
 	codes[DefaultErrorMsg] = ""
 }
 
-// 获取应用设置的错误信息
+// GetMessage 获取应用设置的错误信息
 func GetMessage(errCode int) string {
 	v, ok := codes[errCode]
 	if ok {
@@ -27,15 +27,17 @@ func GetMessage(errCode int) string {
 	return codes[ErrUnknown]
 }
 
+// ConfigNotFound 返回配置未找到错误
 func ConfigNotFound(config string) error {
 	return errors.New("[config] " + config + " not found")
 }
 
+// ConfigError 返回配置错误
 func ConfigError(config string) error {
 	return errors.New("[config] " + config + " error")
 }
 
-// 设置应用的错误信息
+// SetMessage 设置应用的错误信息
 func SetMessage(errCode int, message string) error {
 	if _, ok := codes[errCode]; ok {
 		panic("error code conflict")

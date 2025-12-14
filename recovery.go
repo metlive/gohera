@@ -19,7 +19,7 @@ type panicEx struct {
 	Stack   string `json:"stack"`
 }
 
-// 捕捉异常自动恢复，请求异常或堆栈状态信息写入日志
+// HandlerRecovery 捕获 Panic 并恢复，记录堆栈信息
 func HandlerRecovery(stack bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {

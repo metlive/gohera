@@ -6,6 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// IsIp4 验证是否为有效的 IPv4 地址
 func IsIp4(field validator.FieldLevel) bool {
 	addr := field.Field().String()
 	regStr := `^(([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.)(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){2}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`
@@ -15,6 +16,7 @@ func IsIp4(field validator.FieldLevel) bool {
 	return false
 }
 
+// IsYMD 验证是否为 YYYY-MM-DD 格式
 func IsYMD(field validator.FieldLevel) bool {
 	//(?!0000)  闰年:2016-02-29
 	str := field.Field().String()
@@ -22,6 +24,7 @@ func IsYMD(field validator.FieldLevel) bool {
 	return regexp.MustCompile(regular).MatchString(str)
 }
 
+// IsYMDHM 验证是否为 YYYY-MM-DD HH:mm 格式
 func IsYMDHM(field validator.FieldLevel) bool {
 	//(?!0000)  闰年:2016-02-29  15:04:00
 	str := field.Field().String()
@@ -29,6 +32,7 @@ func IsYMDHM(field validator.FieldLevel) bool {
 	return regexp.MustCompile(regular).MatchString(str)
 }
 
+// IsYMDHMS 验证是否为 YYYY-MM-DD HH:mm:ss 格式
 func IsYMDHMS(field validator.FieldLevel) bool {
 	//(?!0000)  闰年:2016-02-29  15:04:00
 	str := field.Field().String()
@@ -36,6 +40,7 @@ func IsYMDHMS(field validator.FieldLevel) bool {
 	return regexp.MustCompile(regular).MatchString(str)
 }
 
+// IsTest 通用正则验证
 func IsTest(str string, reg string) bool {
 	return regexp.MustCompile(reg).MatchString(str)
 }

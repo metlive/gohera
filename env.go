@@ -24,6 +24,7 @@ var (
 	appPodIp     string
 )
 
+// init 根据环境初始化 Gin 的模式
 func init() {
 	if GetEnv() == DeployEnvDev {
 		gin.SetMode(gin.DebugMode)
@@ -66,26 +67,32 @@ func GetEnv() string {
 	return appEnv
 }
 
+// GetAppMode 获取应用运行模式 (OCEAN_MODE)
 func GetAppMode() string {
 	return appMode
 }
 
+// GetAppName 获取应用名称 (OCEAN_APP)
 func GetAppName() string {
 	return appName
 }
 
+// GetAppNamespace 获取应用命名空间 (NAMESPACE)
 func GetAppNamespace() string {
 	return appNamespace
 }
 
+// GetAppVersion 获取应用版本 (OCEAN_VERSION)
 func GetAppVersion() string {
 	return appVersion
 }
 
+// GetAppPodName 获取 Pod 名称 (HOSTNAME)
 func GetAppPodName() string {
 	return appPodName
 }
 
+// GetAppPodIp 获取 Pod IP (POD_IP)
 func GetAppPodIp() string {
 	return appPodIp
 }

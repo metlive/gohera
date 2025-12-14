@@ -39,6 +39,8 @@ type HTTPRespone struct {
 	error          error
 }
 
+// NewRequest 创建一个新的 HTTPRequest 实例
+// 默认 3秒超时，重试 1 次
 func NewRequest() *HTTPRequest {
 	return &HTTPRequest{
 		client: &http.Client{},
@@ -52,7 +54,7 @@ func NewRequest() *HTTPRequest {
 	}
 }
 
-// 获取响应的header
+// GetRespHeader 获取响应的 Header
 func (h *HTTPRequest) GetRespHeader() http.Header {
 	if h != nil && h.response != nil {
 		return h.response.responseHeader
@@ -60,7 +62,7 @@ func (h *HTTPRequest) GetRespHeader() http.Header {
 	return nil
 }
 
-// 获取响应的cookie
+// GetRespCookie 获取响应的 Cookie
 func (h *HTTPRequest) GetRespCookie() []*http.Cookie {
 	if h != nil && h.response != nil {
 		return h.response.responseCookie
@@ -68,7 +70,7 @@ func (h *HTTPRequest) GetRespCookie() []*http.Cookie {
 	return nil
 }
 
-// 获取响应的状态码
+// GetRespStatus 获取响应的状态码
 func (h *HTTPRequest) GetRespStatus() int {
 	if h != nil && h.response != nil {
 		return h.response.responseCode
@@ -76,24 +78,25 @@ func (h *HTTPRequest) GetRespStatus() int {
 	return 0
 }
 
-// sets the schema's Authorization header to use HTTP Basic Authentication with the provided username and password.
+// SetBasicAuth 设置 HTTP Basic Auth 认证头
 func (h *HTTPRequest) SetBasicAuth(username, password string) *HTTPRequest {
 	h.request.SetBasicAuth(username, password)
 	return h
 }
 
+// SetTransport 设置自定义的 http.RoundTripper
 func (h *HTTPRequest) SetTransport(transport http.RoundTripper) *HTTPRequest {
 	h.transport = transport
 	return h
 }
 
-// 主动设置超时时间,默认3秒超时
+// SetTimeOut 设置请求超时时间 (默认3秒)
 func (h *HTTPRequest) SetTimeOut(timeout int) *HTTPRequest {
 	h.timeout = time.Duration(timeout) * time.Second
 	return h
 }
 
-// Header 主动设置header头,可以覆盖之前的配置,批量添加
+// SetHeaders 批量设置请求头 (覆盖现有同名 Header)
 func (h *HTTPRequest) SetHeaders(header map[string]string) *HTTPRequest {
 	if len(header) > 0 {
 		for k, v := range header {
@@ -103,7 +106,7 @@ func (h *HTTPRequest) SetHeaders(header map[string]string) *HTTPRequest {
 	return h
 }
 
-// Header 主动设置header头,可以覆盖之前的配置，单个添加
+// SetHeader 设置单个请求头 (覆盖现有同名 Header)
 func (h *HTTPRequest) SetHeader(k, v string) *HTTPRequest {
 	if k != "" {
 		h.request.Header.Set(k, v)
@@ -111,7 +114,7 @@ func (h *HTTPRequest) SetHeader(k, v string) *HTTPRequest {
 	return h
 }
 
-// cookie批量添加
+// SetCookies 批量添加 Cookie
 func (h *HTTPRequest) SetCookies(cookies map[string]string) *HTTPRequest {
 	if len(cookies) > 0 {
 		for k, v := range cookies {
@@ -124,7 +127,7 @@ func (h *HTTPRequest) SetCookies(cookies map[string]string) *HTTPRequest {
 	return h
 }
 
-// cookie 单个添加
+// SetCookie 添加单个 Cookie
 func (h *HTTPRequest) SetCookie(k, v string) *HTTPRequest {
 	if k != "" {
 		h.request.AddCookie(&http.Cookie{
@@ -135,22 +138,19 @@ func (h *HTTPRequest) SetCookie(k, v string) *HTTPRequest {
 	return h
 }
 
-// 添加referer
+// SetReferer 设置 Referer 头
 func (h *HTTPRequest) SetReferer(referer string) *HTTPRequest {
 	h.request.Header.Add("referer", referer)
 	return h
 }
 
-// default is 0 means no retried.
-// -1 means retried forever.
-// others means retried times.
+// SetRetries 设置重试次数 (0: 不重试, -1: 无限重试, >0: 重试次数)
 func (h *HTTPRequest) SetRetries(times int) *HTTPRequest {
 	h.retries = times
 	return h
 }
 
-// Param adds query param in to schema.
-// params build query string as ?key1=value1&key2=value2...
+// SetParam 添加查询参数
 func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	if param, ok := h.params[key]; ok {
 		h.params[key] = append(param, fmt.Sprintf("%v", value))
@@ -160,11 +160,13 @@ func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	return h
 }
 
+// Get 发起 GET 请求
 func (h *HTTPRequest) Get(reqUrl string) *HTTPRespone {
 	ctx := context.Background()
 	return h.GetCtx(ctx, reqUrl)
 }
 
+// GetCtx 发起带 Context 的 GET 请求
 func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
 	if len(h.params) > 0 {
@@ -190,12 +192,14 @@ func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	return resp
 }
 
+// DeleteCtx 发起带 Context 的 DELETE 请求
 func (h *HTTPRequest) DeleteCtx(ctx *gin.Context, reqUrl string) *HTTPRespone {
 	h.request.Header.Add("Content-Type", FormContentType)
 	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodDelete, reqUrl)
 	return resp
 }
 
+// PostFormCtx 发起带 Context 的 POST Form 请求
 func (h *HTTPRequest) PostFormCtx(ctx *gin.Context, reqUrl string, params map[string]any) *HTTPRespone {
 	args := &url.Values{}
 	for key, value := range params {
@@ -206,6 +210,7 @@ func (h *HTTPRequest) PostFormCtx(ctx *gin.Context, reqUrl string, params map[st
 	return resp
 }
 
+// PostJsonCtx 发起带 Context 的 POST JSON 请求
 func (h *HTTPRequest) PostJsonCtx(ctx *gin.Context, reqUrl string, params any) *HTTPRespone {
 	h.request.Header.Set("Content-Type", JsonContentType)
 	requestBody, err := json.Marshal(params)
@@ -359,7 +364,7 @@ func (h *HTTPRequest) doRequest(method, reqUrl string) *HTTPRespone {
 	return response
 }
 
-// 信息输出
+// Bytes 获取响应体的字节切片
 func (zr *HTTPRespone) Bytes() ([]byte, error) {
 	if zr.error != nil {
 		return nil, zr.error
@@ -367,6 +372,7 @@ func (zr *HTTPRespone) Bytes() ([]byte, error) {
 	return zr.bytes, nil
 }
 
+// String 获取响应体的字符串形式
 func (zr *HTTPRespone) String() (string, error) {
 	if zr.error != nil {
 		return "", zr.error
@@ -374,10 +380,12 @@ func (zr *HTTPRespone) String() (string, error) {
 	return string(zr.bytes), nil
 }
 
+// Response 获取原始 http.Response
 func (zr *HTTPRespone) Response() (*http.Response, error) {
 	return zr.Response()
 }
 
+// ToJSON 将响应体反序列化为 JSON 对象
 func (zr *HTTPRespone) ToJSON(ret any) error {
 	if zr.error != nil {
 		return zr.error

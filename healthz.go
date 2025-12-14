@@ -11,6 +11,7 @@ type healthZ struct {
 	Env    string `json:"env"`
 }
 
+// healthCheck 健康检查接口
 func healthCheck(c *gin.Context) {
 	h := &healthZ{
 		Status: 200,

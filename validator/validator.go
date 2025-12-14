@@ -20,19 +20,22 @@ type DefaultValidator struct {
 	uni      *ut.UniversalTranslator
 }
 
+// ErrorValidator 自定义验证错误结构体
 type ErrorValidator struct {
 	Code       int    // 错误码
 	Message    string // 错误消息
 	StatusCode int    // 响应状态码
 }
 
+// Error 实现 error 接口
 func (r *ErrorValidator) Error() string {
 	return r.Message
 }
 
 var _ binding.StructValidator = &DefaultValidator{}
 
-// ValidateStruct 如果接收到的类型是一个结构体或指向结构体的指针，则执行验证。
+// ValidateStruct 验证结构体
+// 如果接收到的类型是一个结构体或指向结构体的指针，则执行验证
 func (v *DefaultValidator) ValidateStruct(obj any) error {
 	if kindOfData(obj) == reflect.Struct {
 
@@ -57,7 +60,7 @@ func (v *DefaultValidator) ValidateStruct(obj any) error {
 	return nil
 }
 
-// Engine 返回支持`StructValidator`实现的底层验证引擎
+// Engine 返回支持 StructValidator 实现的底层验证引擎
 func (v *DefaultValidator) Engine() any {
 	v.lazyinit()
 	return v.validate

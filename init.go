@@ -3,19 +3,22 @@ package gohera
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/metlive/gohera/mysql"
 	"github.com/metlive/gohera/redis"
 	"github.com/metlive/gohera/validator"
-	"os"
 )
 
 var env = flag.String("env", DeployEnvDev, "The environment for app run")
 
 const DefaultLogPath = "/var/log/trace"
 
+// InitApp 初始化应用
+// 解析环境变量、配置文件、日志、数据库（MySQL/Redis）、PProf 和验证器，并返回 Gin 引擎
 func InitApp() (router *gin.Engine) {
 	flag.Parse()
 
@@ -46,7 +49,7 @@ func InitApp() (router *gin.Engine) {
 		dbList := GetStringMap("mysql")
 		for key := range dbList {
 			if IsSet("mysql." + key) {
-				var conf = new(mysql.Config)
+				conf := new(mysql.Config)
 				if err = config.UnmarshalKey("mysql."+key, &conf); err != nil {
 					panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 				}
@@ -64,7 +67,7 @@ func InitApp() (router *gin.Engine) {
 
 	// redis初始化
 	if IsSet("redis") {
-		var conf = new(redis.Config)
+		conf := new(redis.Config)
 		if err = config.UnmarshalKey("redis", &conf); err != nil {
 			panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 		}
@@ -92,7 +95,7 @@ func InitApp() (router *gin.Engine) {
 
 	// 数字不要解析成float64
 	binding.EnableDecoderUseNumber = true
-	//注册自定义参数验证
+	// 注册自定义参数验证
 	binding.Validator = new(validator.DefaultValidator)
 	return engine
 }

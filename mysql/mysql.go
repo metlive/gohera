@@ -2,10 +2,11 @@ package mysql
 
 import (
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 	"xorm.io/xorm"
 	"xorm.io/xorm/names"
 )
@@ -14,11 +15,11 @@ type Config struct {
 	MaxLifeTime  time.Duration `toml:"max_life_time"`  // 设置连接可以被重新使用的最大时间量
 	MaxOpenConns int           `toml:"max_open_conns"` // 设置打开连接到数据库的最大数量
 	MaxIdleConns int           `toml:"max_idle_conns"` // 设置空闲连接池中的最大连接数
-	User         string        `toml:"user"`           //用户名
-	Password     string        `toml:"password"`       //密码
-	Host         string        `toml:"host"`           //数据库地址
-	Port         int           `toml:"port"`           //端口
-	Database     string        `toml:"database"`       //连接那个数据库
+	User         string        `toml:"user"`           // 用户名
+	Password     string        `toml:"password"`       // 密码
+	Host         string        `toml:"host"`           // 数据库地址
+	Port         int           `toml:"port"`           // 端口
+	Database     string        `toml:"database"`       // 连接那个数据库
 	Env          string
 }
 
@@ -37,6 +38,7 @@ var (
 	once     sync.Once
 )
 
+// InitOnce 初始化连接池单例
 func InitOnce(conf *Config) *ConnectPool {
 	once.Do(func() {
 		instance = &ConnectPool{
@@ -46,6 +48,7 @@ func InitOnce(conf *Config) *ConnectPool {
 	return instance
 }
 
+// Connect 获取或创建数据库连接
 func (o *ConnectPool) Connect() (*DB, error) {
 	if obj, ok := dbMap[o.config.Database]; ok {
 		return &DB{obj}, nil

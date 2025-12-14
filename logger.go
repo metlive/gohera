@@ -34,6 +34,8 @@ type loggerConfig struct {
 	Mode       string `json:"mode"` // 环境
 }
 
+// initLoggerPool 初始化日志连接池
+// 根据配置初始化不同级别的日志输出（Debug, Info, Warn, Error）
 func initLoggerPool(config loggerConfig) {
 	// 调试级别
 	debugPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
@@ -74,7 +76,8 @@ func initLoggerPool(config loggerConfig) {
 	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
 }
 
-// 新增：获取控制台输出 Core (极简格式)
+// getConsoleCore 获取控制台输出 Core (极简格式)
+// 主要用于非正式环境下的控制台日志输出
 func getConsoleCore(level zapcore.LevelEnabler) zapcore.Core {
 	core := zapcore.NewCore(zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 		MessageKey: "msg", // 仅保留消息内容，留空其他 Key 以隐藏时间、级别等
@@ -88,10 +91,12 @@ type cleanConsoleCore struct {
 	zapcore.Core
 }
 
+// With 实现 zapcore.Core 接口，添加字段
 func (c *cleanConsoleCore) With(fields []zapcore.Field) zapcore.Core {
 	return c // Ignore fields added via With
 }
 
+// Check 实现 zapcore.Core 接口，检查日志级别
 func (c *cleanConsoleCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	if c.Enabled(ent.Level) {
 		return ce.AddCore(ent, c)
@@ -99,11 +104,14 @@ func (c *cleanConsoleCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *z
 	return ce
 }
 
+// Write 实现 zapcore.Core 接口，写入日志
+// 忽略额外字段，仅输出日志消息
 func (c *cleanConsoleCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	return c.Core.Write(ent, nil) // Ignore fields during Write
 }
 
-// 修改：getEncoderCore 仅负责文件写入 (移除 os.Stdout)
+// getEncoderCore 获取文件输出 Core 配置
+// 负责配置日志文件的切割、格式（JSON）及输出级别
 func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
 	// 每小时一个文件
 	logf, _ := rotatelogs.New(fileName+"_%Y-%m-%d",
@@ -133,7 +141,8 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 	}), writer, level)
 }
 
-// 从上下文中获取跟踪ID
+// GetTraceContext 从 Context 中获取 Trace 信息
+// 如果 Context 中不存在 Trace 信息，则返回空的 Trace 对象
 func GetTraceContext(ctx context.Context) *Trace {
 	if ctx == nil {
 		return new(Trace)
@@ -147,7 +156,8 @@ func GetTraceContext(ctx context.Context) *Trace {
 	return new(Trace)
 }
 
-// 开始一个追踪单元
+// getContextFields 从 Context 中提取 Trace 信息并转换为 zap 字段
+// 包含 trace_id, span_id, user_id, path, status 等信息
 func getContextFields(ctx context.Context) []zap.Field {
 	if ctx == nil {
 		ctx = context.Background()
@@ -163,7 +173,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 	return zapFiled
 }
 
-// 判断其他类型--start
+// StartSpan 处理日志格式化并从 Context 中提取跟踪信息
 func StartSpan(ctx context.Context, format string, args ...any) (string, []zap.Field) {
 	// 判断是否有context
 	l := len(args)
@@ -173,65 +183,79 @@ func StartSpan(ctx context.Context, format string, args ...any) (string, []zap.F
 	return format, getContextFields(ctx)
 }
 
+// Info 输出 Info 级别日志
 func Info(ctx context.Context, args ...any) {
 	str, filed := StartSpan(ctx, "%v", args...)
 	logger.Info(str, filed...)
 }
 
+// Infotf 输出带格式化的 Info 级别日志
 func Infotf(ctx context.Context, template string, args ...any) {
 	str, filed := StartSpan(ctx, template, args...)
 	logger.Info(str, filed...)
 }
 
+// Warn 输出 Warn 级别日志
 func Warn(ctx context.Context, args ...any) {
 	str, filed := StartSpan(ctx, "%v", args...)
 	logger.Warn(str, filed...)
 }
 
+// Warntf 输出带格式化的 Warn 级别日志
 func Warntf(ctx context.Context, template string, args ...any) {
 	str, filed := StartSpan(ctx, template, args...)
 	logger.Warn(str, filed...)
 }
 
+// Error 输出 Error 级别日志
 func Error(ctx context.Context, args ...any) {
 	str, filed := StartSpan(ctx, "%v", args...)
 	logger.Error(str, filed...)
 }
 
+// Errortf 输出带格式化的 Error 级别日志
 func Errortf(ctx context.Context, template string, args ...any) {
 	str, filed := StartSpan(ctx, template, args...)
 	logger.Error(str, filed...)
 }
 
+// ContextLogger 绑定了 Context 的日志记录器
 type ContextLogger struct {
 	ctx context.Context
 }
 
-// Ctx creates a new ContextLogger that binds the given context.
+// Ctx 创建一个绑定了 Context 的日志记录器
+// 后续调用 Info/Warn/Error 等方法时无需再次传入 Context
 func Ctx(ctx context.Context) *ContextLogger {
 	return &ContextLogger{ctx: ctx}
 }
 
+// Info 输出 Info 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Info(args ...any) {
 	Info(l.ctx, args...)
 }
 
+// Infotf 输出带格式化的 Info 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Infotf(template string, args ...any) {
 	Infotf(l.ctx, template, args...)
 }
 
+// Warn 输出 Warn 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Warn(args ...any) {
 	Warn(l.ctx, args...)
 }
 
+// Warntf 输出带格式化的 Warn 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Warntf(template string, args ...any) {
 	Warntf(l.ctx, template, args...)
 }
 
+// Error 输出 Error 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Error(args ...any) {
 	Error(l.ctx, args...)
 }
 
+// Errortf 输出带格式化的 Error 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Errortf(template string, args ...any) {
 	Errortf(l.ctx, template, args...)
 }

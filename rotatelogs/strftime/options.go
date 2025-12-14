@@ -15,7 +15,7 @@ func (o *option) Value() any   { return o.value }
 
 const optSpecificationSet = `opt-specification-set`
 
-// WithSpecification allows you to specify a custom specification set
+// WithSpecificationSet 允许指定自定义规范集
 func WithSpecificationSet(ds SpecificationSet) Option {
 	return &option{
 		name:  optSpecificationSet,
@@ -30,8 +30,7 @@ type optSpecificationPair struct {
 
 const optSpecification = `opt-specification`
 
-// WithSpecification allows you to create a new specification set on the fly,
-// to be used only for that invocation.
+// WithSpecification 允许动态创建新的规范
 func WithSpecification(b byte, a Appender) Option {
 	return &option{
 		name: optSpecification,
@@ -42,26 +41,17 @@ func WithSpecification(b byte, a Appender) Option {
 	}
 }
 
-// WithMilliseconds is similar to WithSpecification, and specifies that
-// the Strftime object should interpret the pattern `%b` (where b
-// is the byte that you specify as the argument)
-// as the zero-padded, 3 letter milliseconds of the time.
+// WithMilliseconds 指定 %b 模式（b为参数）解释为毫秒（3位，零填充）
 func WithMilliseconds(b byte) Option {
 	return WithSpecification(b, Milliseconds())
 }
 
-// WithMicroseconds is similar to WithSpecification, and specifies that
-// the Strftime object should interpret the pattern `%b` (where b
-// is the byte that you specify as the argument)
-// as the zero-padded, 3 letter microseconds of the time.
+// WithMicroseconds 指定 %b 模式（b为参数）解释为微秒（3位，零填充）
 func WithMicroseconds(b byte) Option {
 	return WithSpecification(b, Microseconds())
 }
 
-// WithUnixSeconds is similar to WithSpecification, and specifies that
-// the Strftime object should interpret the pattern `%b` (where b
-// is the byte that you specify as the argument)
-// as the unix timestamp in seconds
+// WithUnixSeconds 指定 %b 模式（b为参数）解释为 Unix 时间戳（秒）
 func WithUnixSeconds(b byte) Option {
 	return WithSpecification(b, UnixSeconds())
 }

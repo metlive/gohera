@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 路由注册
+// registerRouter 注册默认路由 (Healthz, 404, 405)
 func registerRouter(engine *gin.Engine) {
 	engine.GET("/healthz", healthCheck)
 	//找不路由报错

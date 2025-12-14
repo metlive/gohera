@@ -31,6 +31,7 @@ type Config struct {
 	writeTimeout   time.Duration
 }
 
+// New 创建一个新的 Redis 客户端
 func New(cfg *Config) (*Client, error) {
 	cfg.idleTimeout = DefaultIdleTimeout
 	cfg.connectTimeout = DefaultConnTimeout

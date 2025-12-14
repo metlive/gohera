@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"sync/atomic"
 	"syscall"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -18,8 +19,9 @@ var (
 	httpPort int
 )
 
+// StartupService 启动 HTTP 服务
+// 根据配置启动 Gin 引擎，并处理平滑退出信号
 func StartupService(engine *gin.Engine) {
-
 	httpHost = GetString("http.host")
 	httpPort = GetInt("http.port")
 	if httpPort == 0 {

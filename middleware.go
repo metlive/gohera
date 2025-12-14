@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// TraceContext 生成链路追踪 ID 的中间件
+// 会检查 Request Header 中的 TraceId, SpanId，如果不存在则生成新的
 func TraceContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		traceID := c.GetHeader(TraceId)
@@ -43,6 +45,7 @@ func TraceContext() gin.HandlerFunc {
 	}
 }
 
+// CorsContext 处理跨域请求 (CORS) 的中间件
 func CorsContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
@@ -77,6 +80,7 @@ func CorsContext() gin.HandlerFunc {
 	}
 }
 
+// RecoveryContext 空实现的 Recovery 中间件 (预留)
 func RecoveryContext() gin.HandlerFunc {
 	return func(context *gin.Context) {
 	}

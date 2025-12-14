@@ -2,8 +2,6 @@ package rotatelogs
 
 import (
 	"fmt"
-	"github.com/metlive/gohera/rotatelogs/strftime"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,14 +9,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/metlive/gohera/rotatelogs/strftime"
+	"github.com/pkg/errors"
 )
 
 func (c clockFn) Now() time.Time {
 	return c()
 }
 
-// New creates a new RotateLogs object. A log filename pattern
-// must be passed. Optional `Option` parameters may be passed
+// New 创建一个新的 RotateLogs 实例
+// 必须传递一个日志文件名模式 (pattern)
 func New(p string, options ...Option) (*RotateLogs, error) {
 	globPattern := p
 	for _, re := range patternConversionRegexps {
@@ -116,10 +117,8 @@ func (rl *RotateLogs) genFilename() string {
 	return strings.ReplaceAll(rl.pattern.FormatString(base), ".log", "") + ".log"
 }
 
-// Write satisfies the io.Writer interface. It writes to the
-// appropriate file handle that is currently being used.
-// If we have reached rotation time, the target file gets
-// automatically rotated, and also purged if necessary.
+// Write 实现 io.Writer 接口
+// 将数据写入当前日志文件，并在需要时进行轮转
 func (rl *RotateLogs) Write(p []byte) (n int, err error) {
 	// Guard against concurrent writes
 	rl.mutex.Lock()
@@ -186,11 +185,11 @@ func (rl *RotateLogs) getWriter_nolock(bailOnRotateFail, useGenerationalNames bo
 	// make sure the dir is existed, eg:
 	// ./foo/bar/baz/hello.log must make sure ./foo/bar/baz is existed
 	dirname := filepath.Dir(filename)
-	if err := os.MkdirAll(dirname, 0755); err != nil {
+	if err := os.MkdirAll(dirname, 0o755); err != nil {
 		return nil, errors.Wrapf(err, "failed to create directory %s", dirname)
 	}
 	// if we got here, then we need to create a file
-	fh, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	fh, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, errors.Errorf("failed to open file %s: %s", rl.pattern, err)
 	}
@@ -228,8 +227,7 @@ func (rl *RotateLogs) getWriter_nolock(bailOnRotateFail, useGenerationalNames bo
 	return fh, nil
 }
 
-// CurrentFileName returns the current file name that
-// the RotateLogs object is writing to
+// CurrentFileName 获取当前正在写入的日志文件名
 func (rl *RotateLogs) CurrentFileName() string {
 	rl.mutex.RLock()
 	defer rl.mutex.RUnlock()
@@ -252,6 +250,7 @@ func (g *cleanupGuard) Enable() {
 	defer g.mutex.Unlock()
 	g.enable = true
 }
+
 func (g *cleanupGuard) Run() {
 	g.fn()
 }
@@ -274,7 +273,7 @@ func (rl *RotateLogs) Rotate() error {
 
 func (rl *RotateLogs) rotate_nolock(filename string) error {
 	lockfn := filename + `_lock`
-	fh, err := os.OpenFile(lockfn, os.O_CREATE|os.O_EXCL, 0644)
+	fh, err := os.OpenFile(lockfn, os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		// Can't lock, just return
 		return err
@@ -314,7 +313,7 @@ func (rl *RotateLogs) rotate_nolock(filename string) error {
 		// the directory where rl.linkName should be created must exist
 		_, err := os.Stat(linkDir)
 		if err != nil { // Assume err != nil means the directory doesn't exist
-			if err := os.MkdirAll(linkDir, 0755); err != nil {
+			if err := os.MkdirAll(linkDir, 0o755); err != nil {
 				return errors.Wrapf(err, `failed to create directory %s`, linkDir)
 			}
 		}
@@ -385,9 +384,7 @@ func (rl *RotateLogs) rotate_nolock(filename string) error {
 	return nil
 }
 
-// Close satisfies the io.Closer interface. You must
-// call this method if you performed any writes to
-// the object.
+// Close 实现 io.Closer 接口，关闭文件句柄
 func (rl *RotateLogs) Close() error {
 	rl.mutex.Lock()
 	defer rl.mutex.Unlock()

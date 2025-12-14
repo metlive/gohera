@@ -116,13 +116,8 @@ func releasdeFmtAppendExecutor(v *appenderExecutor) {
 	fmtAppendExecutorPool.Put(v)
 }
 
-// Format takes the format `s` and the time `t` to produce the
-// format date/time. Note that this function re-compiles the
-// pattern every time it is called.
-//
-// If you know beforehand that you will be reusing the pattern
-// within your application, consider creating a `Strftime` object
-// and reusing it.
+// Format 格式化时间
+// 使用 pattern `p` 和时间 `t` 生成格式化后的字符串
 func Format(p string, t time.Time, options ...Option) (string, error) {
 	// TODO: this may be premature optimization
 	ds, err := getSpecificationSetFor(options...)
@@ -146,8 +141,7 @@ type Strftime struct {
 	compiled appenderList
 }
 
-// New creates a new Strftime object. If the compilation fails, then
-// an error is returned in the second argument.
+// New 创建一个新的 Strftime 对象
 func New(p string, options ...Option) (*Strftime, error) {
 	// TODO: this may be premature optimization
 	ds, err := getSpecificationSetFor(options...)
@@ -168,13 +162,12 @@ func New(p string, options ...Option) (*Strftime, error) {
 	}, nil
 }
 
-// Pattern returns the original pattern string
+// Pattern 返回原始的模式字符串
 func (f *Strftime) Pattern() string {
 	return f.pattern
 }
 
-// Format takes the destination `dst` and time `t`. It formats the date/time
-// using the pre-compiled pattern, and outputs the results to `dst`
+// Format 将格式化后的时间写入 io.Writer
 func (f *Strftime) Format(dst io.Writer, t time.Time) error {
 	const bufSize = 64
 	var b []byte
@@ -191,16 +184,13 @@ func (f *Strftime) Format(dst io.Writer, t time.Time) error {
 	return nil
 }
 
-// FormatBuffer is equivalent to Format, but appends the result directly to
-// supplied slice dst, returning the updated slice. This avoids any internal
-// memory allocation.
+// FormatBuffer 将格式化后的时间追加到 dst 切片中
+// 等同于 Format，但避免内存分配
 func (f *Strftime) FormatBuffer(dst []byte, t time.Time) []byte {
 	return f.format(dst, t)
 }
 
-// Dump outputs the internal structure of the formatter, for debugging purposes.
-// Please do NOT assume the output format to be fixed: it is expected to change
-// in the future.
+// Dump 输出内部结构（调试用）
 func (f *Strftime) Dump(out io.Writer) {
 	f.compiled.dump(out)
 }
@@ -212,8 +202,7 @@ func (f *Strftime) format(b []byte, t time.Time) []byte {
 	return b
 }
 
-// FormatString takes the time `t` and formats it, returning the
-// string containing the formated data.
+// FormatString 格式化时间并返回字符串
 func (f *Strftime) FormatString(t time.Time) string {
 	const bufSize = 64
 	var b []byte

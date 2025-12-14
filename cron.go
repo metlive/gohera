@@ -2,9 +2,10 @@ package gohera
 
 import (
 	"context"
-	"github.com/robfig/cron/v3"
 	"strings"
 	"sync"
+
+	"github.com/robfig/cron/v3"
 )
 
 //执行任务格式举例         			 格式
@@ -39,12 +40,14 @@ type Manager struct {
 	handlerMutex sync.Mutex
 }
 
+// NewJobManager 创建定时任务管理器
 func NewJobManager() *Manager {
 	return &Manager{
 		run: cron.New(cron.WithSeconds()),
 	}
 }
 
+// Command 设置当前任务的名称和处理函数
 func (m *Manager) Command(jobName string, jobFunc func()) *Manager {
 	m.handlerMutex.Lock()
 	defer m.handlerMutex.Unlock()
@@ -62,10 +65,12 @@ func (m *Manager) schedule(sepc string, jobName string, jobFunc func()) {
 	Infotf(ctx, "schedule job name %v", jobName)
 }
 
+// Stop 停止定时任务
 func (m *Manager) Stop() {
 	m.run.Stop()
 }
 
+// Start 启动定时任务
 func (m *Manager) Start() {
 	m.run.Start()
 }
@@ -90,46 +95,56 @@ func (m *Manager) EveryMinutes() {
 	m.schedule("0 */1 * * * *", m.jobName, m.jobFunc)
 }
 
+// EveryFiveMinutes 每五分钟执行
 func (m *Manager) EveryFiveMinutes() {
 	m.schedule("0 */5 * * * *", m.jobName, m.jobFunc)
 }
 
+// EveryTenMinutes 每十分钟执行
 func (m *Manager) EveryTenMinutes() {
 	m.schedule("0 */10 * * * *", m.jobName, m.jobFunc)
 }
 
+// EveryThirtyMinutes 每三十分钟执行
 func (m *Manager) EveryThirtyMinutes() {
 	m.schedule("0 */30 * * * *", m.jobName, m.jobFunc)
 }
 
+// Hourly 每小时执行 (XX:00)
 func (m *Manager) Hourly() {
 	m.schedule("0 0 * * * *", m.jobName, m.jobFunc)
 }
 
+// Daily 每天执行 (00:00)
 func (m *Manager) Daily() {
 	m.schedule("0 0 0 * * *", m.jobName, m.jobFunc)
 }
 
+// Weekly 每周执行 (周日 00:00)
 func (m *Manager) Weekly() {
 	m.schedule("0 0 0 * * 0", m.jobName, m.jobFunc)
 }
 
+// Monthly 每月执行 (1号 00:00)
 func (m *Manager) Monthly() {
 	m.schedule("0 0 0 1 * *", m.jobName, m.jobFunc)
 }
 
+// Yearly 每年执行 (1月1号 00:00)
 func (m *Manager) Yearly() {
 	m.schedule("0 0 0 1 1 *", m.jobName, m.jobFunc)
 }
 
+// Cron 使用自定义 Cron 表达式执行
 func (m *Manager) Cron(sepc string) {
 	m.schedule(sepc, m.jobName, m.jobFunc)
 }
 
+// DailyAt 每天在指定时间执行 (格式 HH:mm)
 func (m *Manager) DailyAt(time string) {
 	segments := strings.Split(time, ":")
 	hour := segments[0]
-	var minute = "*"
+	minute := "*"
 	if len(segments) == 2 {
 		minute = segments[1]
 	}

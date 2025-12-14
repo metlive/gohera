@@ -198,6 +198,43 @@ engine.Find(&record)
 ```go
 gohera.Redis.Set(key, value)
 gohera.Redis.Get(key)
+
+限流使用
+// 限制用户行为：每秒允许 10 次请求，最大突发 20 次
+key := "limit:user:12345"
+rate := 10       // 每秒生成 10 个令牌
+capacity := 20   // 桶容量 20
+required := 1    // 本次消耗 1 个
+
+allowed, err := gohera.Redis.RateLimit(key, rate, capacity, required)
+if err != nil {
+    // Redis 错误处理
+}
+
+if !allowed {
+    // 触发限流，返回 429 Too Many Requests
+    return
+}
+
+分布锁使用
+func DoSomething() {
+    key := "my_resource_lock"
+    requestId := uuid.NewString() // 生成唯一ID
+    ttl := 10 // 10秒过期
+
+    // 1. 尝试加锁
+    if ok, err := gohera.Redis.Lock(key, requestId, ttl); err != nil {
+        // 处理错误
+    } else if !ok {
+        // 获取锁失败（被其他人占用）
+        return
+    }
+
+    // 确保退出时释放锁
+    defer gohera.Redis.Unlock(key, requestId)
+
+    // 2. 执行业务逻辑...
+}
 ```
 
 # response
