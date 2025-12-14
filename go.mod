@@ -1,6 +1,6 @@
 module github.com/metlive/gohera
 
-go 1.22
+go 1.25.5
 
 require (
 	github.com/gin-contrib/pprof v1.4.0
