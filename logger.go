@@ -53,7 +53,7 @@ func initLoggerPool(config loggerConfig) {
 	errorPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool {
 		return lev >= zap.ErrorLevel
 	})
-	
+
 	// 文件输出 Core (保持 JSON 格式)
 	cores := []zapcore.Core{
 		getEncoderCore(fmt.Sprintf("./%s/server_debug.log", config.FilePath), debugPriority, config),
@@ -63,7 +63,7 @@ func initLoggerPool(config loggerConfig) {
 	}
 
 	// 新增：非正式环境添加控制台输出 (无格式纯文本)
-	if config.Mode != "pro" {
+	if GetBool("log.stdout") {
 		// 使用 zap.DebugLevel 允许输出 Debug 及以上所有级别日志
 		cores = append(cores, getConsoleCore(zap.DebugLevel))
 	}
@@ -119,7 +119,7 @@ func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerCo
 		rotatelogs.WithMaxAge(7*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),
 	)
-	
+
 	// 修改处：不再包含 os.Stdout，只写入文件
 	writer := zapcore.AddSync(logf)
 
