@@ -17,8 +17,6 @@
 
 # 安装方式
 
-具体使用方法细节可以参考https://wiki.zhiyinlou.com/display/businessDahai/Go+Module
-
 ```go
 // 安装方式
 go get -v -t github.com/metlive/gohera
@@ -199,7 +197,7 @@ engine.Find(&record)
 gohera.Redis.Set(key, value)
 gohera.Redis.Get(key)
 
-限流使用
+// 限流使用
 // 限制用户行为：每秒允许 10 次请求，最大突发 20 次
 key := "limit:user:12345"
 rate := 10       // 每秒生成 10 个令牌
@@ -216,7 +214,7 @@ if !allowed {
     return
 }
 
-分布锁使用
+// 分布锁使用
 func DoSomething() {
     key := "my_resource_lock"
     requestId := uuid.NewString() // 生成唯一ID
