@@ -17,8 +17,6 @@
 
 # 安装方式
 
-具体使用方法细节可以参考https://wiki.zhiyinlou.com/display/businessDahai/Go+Module
-
 ```go
 // 安装方式
 go get -v -t github.com/metlive/gohera
