@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,16 +20,35 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	defaultHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			MaxIdleConnsPerHost:   20,
+		},
+	}
+)
+
 type HTTPRequest struct {
 	client    *http.Client
-	request   *http.Request
 	transport http.RoundTripper
+	header    http.Header
 	timeout   time.Duration
 	response  *HTTPRespone
 	ctx       context.Context
 	retries   int
-	params    map[string][]string
+	params    url.Values
 	url       string
+	body      []byte
+	method    string
 }
 
 type HTTPRespone struct {
@@ -36,19 +57,16 @@ type HTTPRespone struct {
 	responseHeader http.Header
 	responseCookie []*http.Cookie
 	bytes          []byte
-	error          error
+	Error          error // 改为导出字段或保持兼容性，但计划中提到导出或提供更好访问
 }
 
 // NewRequest 创建一个新的 HTTPRequest 实例
 // 默认 3秒超时，重试 1 次
 func NewRequest() *HTTPRequest {
 	return &HTTPRequest{
-		client: &http.Client{},
-		request: &http.Request{
-			Header: make(http.Header),
-		},
-
-		params:  make(map[string][]string),
+		client:  defaultHTTPClient,
+		header:  make(http.Header),
+		params:  make(url.Values),
 		timeout: 3 * time.Second,
 		retries: 1,
 	}
@@ -80,8 +98,13 @@ func (h *HTTPRequest) GetRespStatus() int {
 
 // SetBasicAuth 设置 HTTP Basic Auth 认证头
 func (h *HTTPRequest) SetBasicAuth(username, password string) *HTTPRequest {
-	h.request.SetBasicAuth(username, password)
+	h.header.Set("Authorization", "Basic "+basicAuth(username, password))
 	return h
+}
+
+func basicAuth(username, password string) string {
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
 // SetTransport 设置自定义的 http.RoundTripper
@@ -100,7 +123,7 @@ func (h *HTTPRequest) SetTimeOut(timeout int) *HTTPRequest {
 func (h *HTTPRequest) SetHeaders(header map[string]string) *HTTPRequest {
 	if len(header) > 0 {
 		for k, v := range header {
-			h.request.Header.Set(k, v)
+			h.header.Set(k, v)
 		}
 	}
 	return h
@@ -109,7 +132,7 @@ func (h *HTTPRequest) SetHeaders(header map[string]string) *HTTPRequest {
 // SetHeader 设置单个请求头 (覆盖现有同名 Header)
 func (h *HTTPRequest) SetHeader(k, v string) *HTTPRequest {
 	if k != "" {
-		h.request.Header.Set(k, v)
+		h.header.Set(k, v)
 	}
 	return h
 }
@@ -118,10 +141,7 @@ func (h *HTTPRequest) SetHeader(k, v string) *HTTPRequest {
 func (h *HTTPRequest) SetCookies(cookies map[string]string) *HTTPRequest {
 	if len(cookies) > 0 {
 		for k, v := range cookies {
-			h.request.AddCookie(&http.Cookie{
-				Name:  k,
-				Value: v,
-			})
+			h.SetCookie(k, v)
 		}
 	}
 	return h
@@ -130,17 +150,14 @@ func (h *HTTPRequest) SetCookies(cookies map[string]string) *HTTPRequest {
 // SetCookie 添加单个 Cookie
 func (h *HTTPRequest) SetCookie(k, v string) *HTTPRequest {
 	if k != "" {
-		h.request.AddCookie(&http.Cookie{
-			Name:  k,
-			Value: v,
-		})
+		h.header.Add("Cookie", (&http.Cookie{Name: k, Value: v}).String())
 	}
 	return h
 }
 
 // SetReferer 设置 Referer 头
 func (h *HTTPRequest) SetReferer(referer string) *HTTPRequest {
-	h.request.Header.Add("referer", referer)
+	h.header.Add("Referer", referer)
 	return h
 }
 
@@ -152,11 +169,7 @@ func (h *HTTPRequest) SetRetries(times int) *HTTPRequest {
 
 // SetParam 添加查询参数
 func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
-	if param, ok := h.params[key]; ok {
-		h.params[key] = append(param, fmt.Sprintf("%v", value))
-	} else {
-		h.params[key] = []string{fmt.Sprintf("%v", value)}
-	}
+	h.params.Add(key, fmt.Sprintf("%v", value))
 	return h
 }
 
@@ -168,113 +181,109 @@ func (h *HTTPRequest) Get(reqUrl string) *HTTPRespone {
 
 // GetCtx 发起带 Context 的 GET 请求
 func (h *HTTPRequest) GetCtx(ctx context.Context, reqUrl string) *HTTPRespone {
-	h.request.Header.Add("Content-Type", FormContentType)
-	if len(h.params) > 0 {
-		var paramBody string
-		var buf bytes.Buffer
-		for k, v := range h.params {
-			for _, vv := range v {
-				buf.WriteString(url.QueryEscape(k))
-				buf.WriteByte('=')
-				buf.WriteString(url.QueryEscape(vv))
-				buf.WriteByte('&')
-			}
-		}
-		paramBody = buf.String()
-		paramBody = paramBody[0 : len(paramBody)-1]
-		if strings.Contains(reqUrl, "?") {
-			reqUrl += "&" + paramBody
-		} else {
-			reqUrl = reqUrl + "?" + paramBody
-		}
-	}
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodGet, reqUrl)
-	return resp
+	h.header.Set("Content-Type", FormContentType)
+	h.url = reqUrl
+	h.method = http.MethodGet
+	return h.doRequest(ctx)
 }
 
 // DeleteCtx 发起带 Context 的 DELETE 请求
-func (h *HTTPRequest) DeleteCtx(ctx *gin.Context, reqUrl string) *HTTPRespone {
-	h.request.Header.Add("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).doRequest(http.MethodDelete, reqUrl)
-	return resp
+func (h *HTTPRequest) DeleteCtx(ctx context.Context, reqUrl string) *HTTPRespone {
+	h.header.Set("Content-Type", FormContentType)
+	h.url = reqUrl
+	h.method = http.MethodDelete
+	return h.doRequest(ctx)
 }
 
 // PostFormCtx 发起带 Context 的 POST Form 请求
-func (h *HTTPRequest) PostFormCtx(ctx *gin.Context, reqUrl string, params map[string]any) *HTTPRespone {
-	args := &url.Values{}
+func (h *HTTPRequest) PostFormCtx(ctx context.Context, reqUrl string, params map[string]any) *HTTPRespone {
+	args := url.Values{}
 	for key, value := range params {
 		args.Add(key, fmt.Sprintf("%v", value))
 	}
-	h.request.Header.Set("Content-Type", FormContentType)
-	resp := h.setTrace(ctx).setReferer(ctx).setBody([]byte(args.Encode())).doRequest(http.MethodPost, reqUrl)
-	return resp
+	h.header.Set("Content-Type", FormContentType)
+	h.url = reqUrl
+	h.method = http.MethodPost
+	h.body = []byte(args.Encode())
+	return h.doRequest(ctx)
 }
 
 // PostJsonCtx 发起带 Context 的 POST JSON 请求
-func (h *HTTPRequest) PostJsonCtx(ctx *gin.Context, reqUrl string, params any) *HTTPRespone {
-	h.request.Header.Set("Content-Type", JsonContentType)
+func (h *HTTPRequest) PostJsonCtx(ctx context.Context, reqUrl string, params any) *HTTPRespone {
+	h.header.Set("Content-Type", JsonContentType)
 	requestBody, err := json.Marshal(params)
-	resp := &HTTPRespone{}
 	if err != nil {
-		resp.error = errors.New("json marshal fail")
-		return resp
+		return &HTTPRespone{Error: errors.New("json marshal fail: " + err.Error())}
 	}
-	resp = h.setTrace(ctx).setReferer(ctx).setBody(requestBody).doRequest(http.MethodPost, reqUrl)
-	return resp
+	h.url = reqUrl
+	h.method = http.MethodPost
+	h.body = requestBody
+	return h.doRequest(ctx)
 }
 
-func (h *HTTPRequest) setBody(body []byte) *HTTPRequest {
-	bf := bytes.NewBuffer(body)
-	h.request.Body = io.NopCloser(bf)
-	h.request.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bf), nil
+func (h *HTTPRequest) setBody(req *http.Request) {
+	if len(h.body) > 0 {
+		req.Body = io.NopCloser(bytes.NewReader(h.body))
+		req.ContentLength = int64(len(h.body))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(h.body)), nil
+		}
 	}
-	h.request.ContentLength = int64(len(body))
-	return h
 }
 
 // 自动添加referers
-func (h *HTTPRequest) setReferer(ctx context.Context) *HTTPRequest {
+func (h *HTTPRequest) setReferer(ctx context.Context, req *http.Request) {
+	if h.header.Get("Referer") != "" {
+		return
+	}
 	appName := GetString("http.service")
 	value := ""
-	if ctx != nil && h.request != nil {
-		value = `http://` + h.request.Host + h.request.RequestURI
+	if req.URL != nil {
+		value = `http://` + req.Host + req.URL.RequestURI()
 	} else if appName != "" {
 		value = `http://` + appName + "/cmd"
 	}
 	if value != "" {
-		h.request.Header.Add("referer", value)
+		req.Header.Set("Referer", value)
 	}
-	return h
 }
 
 // 设置链路追踪,trace_id相关
-func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
+func (h *HTTPRequest) setTrace(cx context.Context, req *http.Request) context.Context {
 	if cx == nil {
 		cx = context.Background()
 	}
 	traceInfo := new(Trace)
 	spanId := SpanIdDefault
-	if ctx, ok := cx.(*gin.Context); ok {
-		traceInfo = ctx.MustGet(TraceCtx).(*Trace)
+
+	if gCtx, ok := cx.(*gin.Context); ok {
+		if val, exists := gCtx.Get(TraceCtx); exists {
+			if t, ok := val.(*Trace); ok {
+				traceInfo = t
+			}
+		}
 		if traceInfo.SpanId == "" {
 			traceInfo.SpanId = SpanIdDefault
 		}
 		indexArr := strings.Split(traceInfo.SpanId, ".")
 		index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
 		spanId = traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
-		ctx.Set(TraceCtx, &Trace{
+
+		newTrace := &Trace{
 			TraceId: traceInfo.TraceId,
 			SpanId:  spanId,
 			UserId:  traceInfo.UserId,
 			Method:  traceInfo.Method,
-			Path:    ctx.Request.URL.Host + ctx.Request.URL.Path,
-			Status:  ctx.Writer.Status(),
-			Headers: getHeader(h.request.Header),
-		})
+			Path:    req.URL.Host + req.URL.Path,
+			Status:  gCtx.Writer.Status(),
+			Headers: getHeader(h.header),
+		}
+		gCtx.Set(TraceCtx, newTrace)
+		traceInfo = newTrace
+		cx = context.WithValue(gCtx.Request.Context(), TraceCtx, traceInfo)
 	} else {
-		if h.request.Header.Get(SpanId) != "" {
-			traceInfo.SpanId = h.request.Header.Get(SpanId)
+		if h.header.Get(SpanId) != "" {
+			traceInfo.SpanId = h.header.Get(SpanId)
 		}
 		if traceInfo.SpanId == "" {
 			traceInfo.SpanId = SpanIdDefault
@@ -286,109 +295,142 @@ func (h *HTTPRequest) setTrace(cx context.Context) *HTTPRequest {
 			TraceId: strings.ReplaceAll(uuid.NewString(), "-", ""),
 			SpanId:  spanId,
 			UserId:  0,
-			Method:  h.request.Method,
+			Method:  h.method,
 			Path:    h.url,
 			Status:  200,
-			Headers: getHeader(h.request.Header),
+			Headers: getHeader(h.header),
 		}
-		context.WithValue(cx, TraceCtx, traceInfo)
+		cx = context.WithValue(cx, TraceCtx, traceInfo)
 	}
+
 	for k, v := range traceInfo.Headers {
 		if v1, ok := v.(string); ok {
-			h.request.Header.Set(k, v1)
+			req.Header.Set(k, v1)
 		}
 	}
-	h.request.Header.Set(SpanId, spanId)
-	return h
+	req.Header.Set(SpanId, spanId)
+	req.Header.Set(TraceId, traceInfo.TraceId)
+	return cx
 }
 
 // 发起http请求,获取响应并设置对应的值
-func (h *HTTPRequest) doRequest(method, reqUrl string) *HTTPRespone {
-	h.request.Method = method
-	u, err := url.Parse(reqUrl)
-	Infotf(h.ctx, "request %v: %v", method, u)
-	response := &HTTPRespone{}
-	if err != nil {
-		response.error = err
-		return response
+func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	h.request.URL = u
-	if h.transport == nil {
-		h.client.Transport = http.DefaultTransport
-	} else {
+
+	u, err := url.Parse(h.url)
+	if err != nil {
+		return &HTTPRespone{Error: err}
+	}
+
+	// 注入查询参数
+	if len(h.params) > 0 {
+		q := u.Query()
+		for k, vs := range h.params {
+			for _, v := range vs {
+				q.Add(k, v)
+			}
+		}
+		u.RawQuery = q.Encode()
+	}
+
+	Infotf(ctx, "request %v: %v", h.method, u.String())
+
+	req, err := http.NewRequestWithContext(ctx, h.method, u.String(), nil)
+	if err != nil {
+		return &HTTPRespone{Error: err}
+	}
+
+	// 设置 Header
+	req.Header = h.header.Clone()
+
+	h.setBody(req)
+	newCtx := h.setTrace(ctx, req)
+	req = req.WithContext(newCtx)
+	h.setReferer(newCtx, req)
+
+	if h.transport != nil {
 		h.client.Transport = h.transport
 	}
 	h.client.Timeout = h.timeout
-	// 请求测试次数
+
 	var resp *http.Response
 	for i := 0; h.retries == -1 || i <= h.retries; i++ {
-		resp, err = h.client.Do(h.request)
+		if i > 0 {
+			Infotf(newCtx, "retry request %v: %v, times: %d", h.method, u.String(), i)
+		}
+		resp, err = h.client.Do(req)
 		if err == nil {
 			break
 		}
+		if newCtx.Err() != nil {
+			return &HTTPRespone{Error: newCtx.Err()}
+		}
 	}
 
 	if err != nil {
-		response.error = err
-		return response
+		return &HTTPRespone{Error: err}
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			response.error = err
-			return
-		}
-	}(resp.Body)
+
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
 	var reader io.Reader
 	if resp.Header.Get("Content-Encoding") == "gzip" {
-		reader, err = gzip.NewReader(resp.Body)
+		gzReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
-			response.error = err
-			return response
+			return &HTTPRespone{Error: err, responseCode: resp.StatusCode}
 		}
+		defer gzReader.Close()
+		reader = gzReader
 	} else {
 		reader = resp.Body
 	}
+
 	body, err := io.ReadAll(reader)
 	if err != nil {
-		response.error = err
-		return response
+		return &HTTPRespone{Error: err, responseCode: resp.StatusCode}
 	}
-	response.responseCode = resp.StatusCode
-	response.responseCookie = resp.Cookies()
-	response.responseHeader = resp.Header
-	response.bytes = body
-	response.response = resp
-	h.response = response
 
-	return response
+	hr := &HTTPRespone{
+		responseCode:   resp.StatusCode,
+		responseCookie: resp.Cookies(),
+		responseHeader: resp.Header,
+		bytes:          body,
+		response:       resp,
+	}
+	h.response = hr
+	return hr
 }
 
 // Bytes 获取响应体的字节切片
 func (zr *HTTPRespone) Bytes() ([]byte, error) {
-	if zr.error != nil {
-		return nil, zr.error
+	if zr.Error != nil {
+		return nil, zr.Error
 	}
 	return zr.bytes, nil
 }
 
 // String 获取响应体的字符串形式
 func (zr *HTTPRespone) String() (string, error) {
-	if zr.error != nil {
-		return "", zr.error
+	if zr.Error != nil {
+		return "", zr.Error
 	}
 	return string(zr.bytes), nil
 }
 
 // Response 获取原始 http.Response
 func (zr *HTTPRespone) Response() (*http.Response, error) {
-	return zr.Response()
+	return zr.response, zr.Error
 }
 
 // ToJSON 将响应体反序列化为 JSON 对象
 func (zr *HTTPRespone) ToJSON(ret any) error {
-	if zr.error != nil {
-		return zr.error
+	if zr.Error != nil {
+		return zr.Error
 	}
 	if zr.bytes == nil {
 		return errors.New("body empty")
