@@ -18,7 +18,7 @@ type Tx struct {
 
 // NewSession 创建新会话
 func (db *DB) NewSession() *Session {
-	return &Session{db.EngineGroup.NewSession()}
+	return &Session{db.Engine.NewSession()}
 }
 
 // Session 获取会话实例
@@ -46,7 +46,10 @@ func (db *DB) WithTransaction(fn func(*Tx) error) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			err := tx.Rollback()
+			if err != nil {
+				return
+			}
 			panic(r)
 		}
 	}()

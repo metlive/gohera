@@ -30,11 +30,11 @@ type ConnectPool struct {
 	config *Config
 }
 type DB struct {
-	*xorm.EngineGroup
+	*xorm.Engine
 }
 
 var (
-	dbMap    = make(map[string]*xorm.EngineGroup)
+	dbMap    = make(map[string]*xorm.Engine)
 	instance *ConnectPool
 	once     sync.Once
 )
@@ -54,15 +54,11 @@ func (o *ConnectPool) Connect() (*DB, error) {
 	if obj, ok := dbMap[o.config.Database]; ok {
 		return &DB{obj}, nil
 	} else {
-		var dataSource []string
-		hosts := strings.Split(o.config.Host, ",")
-		for _, host := range hosts {
-			dataSource = append(dataSource, fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", o.config.User, o.config.Password, host, o.config.Database))
-		}
+		var dataSource = fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", o.config.User, o.config.Password, o.config.Host, o.config.Database)
 		o.mutex.Lock()
 		defer o.mutex.Unlock()
-		var obj *xorm.EngineGroup
-		obj, err := xorm.NewEngineGroup("mysql", dataSource, xorm.LeastConnPolicy())
+		var obj *xorm.Engine
+		obj, err := xorm.NewEngine("mysql", dataSource)
 		if err != nil {
 			return nil, err
 		}
@@ -90,5 +86,5 @@ func (o *ConnectPool) Connect() (*DB, error) {
 
 // Context 返回带有上下文的 Session
 func (db *DB) Context(ctx context.Context) *Session {
-	return &Session{db.EngineGroup.Context(ctx)}
+	return &Session{db.Engine.Context(ctx)}
 }
