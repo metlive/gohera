@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"context"
+
 	"xorm.io/xorm"
 )
 
@@ -72,9 +74,20 @@ func (tx *Tx) Rollback() error {
 	return err
 }
 
+// Context 返回带有上下文的 Session
+func (s *Session) Context(ctx context.Context) *Session {
+	s.Session.Context(ctx)
+	return s
+}
+
 // Table 指定表名
 func (s *Session) Table(tableNameOrStruct interface{}) *Session {
 	s.Session.Table(tableNameOrStruct)
+	return s
+}
+
+func (s *Session) Sql(query interface{}, args ...interface{}) *Session {
+	s.Session.SQL(query, args...)
 	return s
 }
 
