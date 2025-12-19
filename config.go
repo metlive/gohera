@@ -1,29 +1,51 @@
 package gohera
 
 import (
+	"errors"
+	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
 
-var config *viper.Viper
+var config = viper.New()
+var configLoaded bool
+
+func init() {
+	// 尝试在包加载时初始化配置，以便包级别的变量初始化可以获取到配置
+	_ = initAppConfig()
+}
 
 // initAppConfig 初始化应用配置
-// 使用 viper 加载 ./config/app.toml 配置文件
+// 按照优先级从当前目录、./config、./configs 加载 app.toml/yaml/json 等配置文件
 func initAppConfig() error {
-	if config != nil {
+	if configLoaded {
 		return nil
 	}
 
-	config = viper.New()
 	config.SetConfigName("app")
+	config.AddConfigPath("./")
 	config.AddConfigPath("./config")
-	config.SetConfigType("toml")
+	config.AddConfigPath("./configs")
 
 	err := config.ReadInConfig()
 	if err != nil {
 		return err
 	}
+
+	config.SetEnvPrefix("APP")
+	config.AutomaticEnv()
+	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	config.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Printf("Config file changed: %s\n", e.Name)
+	})
+	config.WatchConfig()
+
+	configLoaded = true
 	return nil
 }
 
@@ -122,5 +144,9 @@ func IsSet(key string) bool {
 
 // UnmarshalKey 将配置反序列化到结构体
 func UnmarshalKey(key string, rawVal any) error {
+	rv := reflect.ValueOf(rawVal)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return errors.New("rawVal must be a non-nil pointer")
+	}
 	return config.UnmarshalKey(key, rawVal)
 }

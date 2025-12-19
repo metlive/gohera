@@ -50,7 +50,7 @@ func InitApp() (router *gin.Engine) {
 		for key := range dbList {
 			if IsSet("mysql." + key) {
 				conf := new(mysql.Config)
-				if err = config.UnmarshalKey("mysql."+key, &conf); err != nil {
+				if err = UnmarshalKey("mysql."+key, conf); err != nil {
 					panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 				}
 				Mysql[key] = func(conf *mysql.Config) *mysql.DB {
@@ -68,7 +68,7 @@ func InitApp() (router *gin.Engine) {
 	// redis初始化
 	if IsSet("redis") {
 		conf := new(redis.Config)
-		if err = config.UnmarshalKey("redis", &conf); err != nil {
+		if err = UnmarshalKey("redis", conf); err != nil {
 			panic(fmt.Errorf("unable to decode dbConfig struct：  %s \n pid:%d", err, os.Getpid()))
 		}
 		Redis, err = redis.New(conf)
