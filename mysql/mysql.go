@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -85,4 +86,9 @@ func (o *ConnectPool) Connect() (*DB, error) {
 		dbMap[o.config.Database] = obj
 		return &DB{obj}, nil
 	}
+}
+
+// Context 返回带有上下文的 Session
+func (db *DB) Context(ctx context.Context) *Session {
+	return &Session{db.EngineGroup.Context(ctx)}
 }

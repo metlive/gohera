@@ -187,6 +187,27 @@ return record, nil
 // 默认会通过从库读取数据，如果需要强制读主
 engine := gohera.Mysql.getMaster()
 engine.Find(&record)
+
+// 事务处理
+// Tx 结构体：对 xorm.Session 的封装，用于处理事务。
+// Begin 方法：从 DB 实例开始一个新事务，返回 Tx 对象。
+// WithTransaction 方法：提供一个便捷的方法，在事务中执行函数，并自动处理提交和回滚。
+// Commit 和 Rollback 方法：分别用于提交和回滚事务，并自动关闭会话。
+// 方式一：手动控制事务
+tx, err := db.Begin()
+if err != nil {
+    // 处理错误
+}
+// 执行数据库操作
+err = tx.Commit() // 或者 tx.Rollback()
+
+// 方式二：使用 WithTransaction 自动管理
+err := db.WithTransaction(func(tx *Tx) error {
+    // 执行数据库操作
+    // 如果返回错误，会自动回滚
+    // 如果正常执行，会自动提交
+    return nil
+})
 ```
 
 # redis
