@@ -28,7 +28,13 @@ func (db *DB) Session() *Session {
 
 // Begin 开始事务
 func (db *DB) Begin() (*Tx, error) {
+	return db.BeginTx(context.Background())
+}
+
+// BeginTx 开始带上下文的事务
+func (db *DB) BeginTx(ctx context.Context) (*Tx, error) {
 	session := db.NewSession()
+	session.Session = session.Session.Context(ctx)
 	err := session.Begin()
 	if err != nil {
 		session.Close()
@@ -39,23 +45,24 @@ func (db *DB) Begin() (*Tx, error) {
 
 // WithTransaction 在事务中执行函数
 func (db *DB) WithTransaction(fn func(*Tx) error) error {
-	tx, err := db.Begin()
+	return db.WithTransactionCtx(context.Background(), fn)
+}
+
+// WithTransactionCtx 在带上下文的事务中执行函数
+func (db *DB) WithTransactionCtx(ctx context.Context, fn func(*Tx) error) error {
+	tx, err := db.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
-			err := tx.Rollback()
-			if err != nil {
-				return
-			}
+			_ = tx.Rollback()
 			panic(r)
 		}
 	}()
 
-	err = fn(tx)
-	if err != nil {
+	if err = fn(tx); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -79,54 +86,55 @@ func (tx *Tx) Rollback() error {
 
 // Context 返回带有上下文的 Session
 func (s *Session) Context(ctx context.Context) *Session {
-	s.Session.Context(ctx)
+	s.Session = s.Session.Context(ctx)
 	return s
 }
 
 // Table 指定表名
 func (s *Session) Table(tableNameOrStruct interface{}) *Session {
-	s.Session.Table(tableNameOrStruct)
+	s.Session = s.Session.Table(tableNameOrStruct)
 	return s
 }
 
-func (s *Session) Sql(query interface{}, args ...interface{}) *Session {
-	s.Session.SQL(query, args...)
+// SQL 执行自定义 SQL
+func (s *Session) SQL(query interface{}, args ...interface{}) *Session {
+	s.Session = s.Session.SQL(query, args...)
 	return s
 }
 
 // Where 添加查询条件
 func (s *Session) Where(query interface{}, args ...interface{}) *Session {
-	s.Session.Where(query, args...)
+	s.Session = s.Session.Where(query, args...)
 	return s
 }
 
 // Limit 分页查询
 func (s *Session) Limit(limit int, start ...int) *Session {
-	s.Session.Limit(limit, start...)
+	s.Session = s.Session.Limit(limit, start...)
 	return s
 }
 
 // Desc 降序
 func (s *Session) Desc(colNames ...string) *Session {
-	s.Session.Desc(colNames...)
+	s.Session = s.Session.Desc(colNames...)
 	return s
 }
 
 // Asc 升序
 func (s *Session) Asc(colNames ...string) *Session {
-	s.Session.Asc(colNames...)
+	s.Session = s.Session.Asc(colNames...)
 	return s
 }
 
 // ID 指定主键
 func (s *Session) ID(id interface{}) *Session {
-	s.Session.ID(id)
+	s.Session = s.Session.ID(id)
 	return s
 }
 
 // In 指定 IN 条件
 func (s *Session) In(column string, args ...interface{}) *Session {
-	s.Session.In(column, args...)
+	s.Session = s.Session.In(column, args...)
 	return s
 }
 
