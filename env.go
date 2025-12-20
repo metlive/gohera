@@ -1,17 +1,17 @@
 package gohera
 
 import (
-	"errors"
+	"fmt"
 	"os"
 
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	DeployEnvDev  = "Dev"
-	DeployEnvTest = "Test"
-	DeployEnvPre  = "Pre"
-	DeployEnvProd = "Prod"
+	DeployEnvDev  = "dev"
+	DeployEnvTest = "test"
+	DeployEnvPre  = "pre"
+	DeployEnvProd = "prod"
 )
 
 var (
@@ -24,47 +24,65 @@ var (
 	appPodIp     string
 )
 
-// init 根据环境初始化 Gin 的模式
-func init() {
-	if GetEnv() == DeployEnvDev {
+// parseEnv 解析环境变量
+func parseEnv(env string) error {
+	if env == "" {
+		env = DeployEnvDev
+	}
+
+	switch env {
+	case DeployEnvDev, DeployEnvTest, DeployEnvPre, DeployEnvProd:
+		appEnv = env
+	default:
+		return fmt.Errorf("invalid environment: %s", env)
+	}
+
+	appMode = os.Getenv("APP_MODE")
+	appName = os.Getenv("APP_NAME")
+	appNamespace = os.Getenv("NAMESPACE")
+	appVersion = os.Getenv("APP_VERSION")
+	appPodName = os.Getenv("HOSTNAME")
+	appPodIp = os.Getenv("POD_IP")
+
+	updateGinMode()
+	return nil
+}
+
+// updateGinMode 根据当前环境更新 Gin 的模式
+func updateGinMode() {
+	switch appEnv {
+	case DeployEnvDev:
 		gin.SetMode(gin.DebugMode)
-	} else if GetEnv() == DeployEnvTest {
+	case DeployEnvTest:
 		gin.SetMode(gin.TestMode)
-	} else {
+	default:
 		gin.SetMode(gin.ReleaseMode)
 	}
 }
 
-// 解析环境变量
-func parseEnv(env string) error {
-	appEnv = env
-	if env == "" {
-		appEnv = DeployEnvDev
-	}
-
-	appMode = os.Getenv("OCEAN_MODE")
-	appName = os.Getenv("OCEAN_APP")
-	appNamespace = os.Getenv("NAMESPACE")
-	appVersion = os.Getenv("OCEAN_VERSION")
-	appPodName = os.Getenv("HOSTNAME")
-	appPodIp = os.Getenv("POD_IP")
-
-	switch env {
-	case DeployEnvProd:
-		return nil
-	case DeployEnvPre:
-		return nil
-	case DeployEnvTest:
-		return nil
-	case DeployEnvDev:
-		return nil
-	}
-	return errors.New("parse env error")
-}
-
-// 获取运行环境
+// GetEnv 获取运行环境
 func GetEnv() string {
 	return appEnv
+}
+
+// IsDev 是否为开发环境
+func IsDev() bool {
+	return appEnv == DeployEnvDev
+}
+
+// IsTest 是否为测试环境
+func IsTest() bool {
+	return appEnv == DeployEnvTest
+}
+
+// IsPre 是否为预发布环境
+func IsPre() bool {
+	return appEnv == DeployEnvPre
+}
+
+// IsProd 是否为生产环境
+func IsProd() bool {
+	return appEnv == DeployEnvProd
 }
 
 // GetAppMode 获取应用运行模式 (OCEAN_MODE)
@@ -95,4 +113,12 @@ func GetAppPodName() string {
 // GetAppPodIp 获取 Pod IP (POD_IP)
 func GetAppPodIp() string {
 	return appPodIp
+}
+
+// GetEnvWithDefault 获取环境变量，如果不存在则返回默认值
+func GetEnvWithDefault(key, defaultValue string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultValue
 }

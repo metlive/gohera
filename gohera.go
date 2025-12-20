@@ -30,7 +30,7 @@ func StartupService(engine *gin.Engine) {
 	addr := httpHost + ":" + strconv.Itoa(httpPort)
 	ac := make(chan error)
 	go func() {
-		fmt.Printf("服务启动，运行模式：%v，版本号：%s，进程号：%d , ip：%s", GetEnv(), "1.0.0", os.Getpid(), addr)
+		fmt.Printf("服务启动，运行模式：%v，版本号：%s，进程号：%d , ip：%s", GetEnv(), GetAppVersion(), os.Getpid(), addr)
 		fmt.Println("")
 		err := engine.Run(addr)
 		if err != nil && errors.Is(err, http.ErrServerClosed) {

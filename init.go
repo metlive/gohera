@@ -81,7 +81,7 @@ func InitApp() (router *gin.Engine) {
 	// 初始化上下文
 	engine.Use(TraceContext())
 	// 异常捕获
-	if GetEnv() != DeployEnvDev {
+	if !IsDev() {
 		engine.Use(HandlerRecovery(true))
 	}
 	// 记录请求日志

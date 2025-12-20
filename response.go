@@ -10,7 +10,7 @@ import (
 type httpResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
-	Result  any    `json:"result"`
+	Result  any    `json:"data"`
 }
 
 var contexts *gin.Context
@@ -18,7 +18,7 @@ var contexts *gin.Context
 // JsonError 返回 JSON 格式的错误响应
 func JsonError(c *gin.Context, code int, message ...string) {
 	msg := GetMessage(DefaultErrorMsg)
-	if len(message) <= 0 {
+	if len(message) > 0 {
 		msg = message[0]
 	}
 	c.JSON(http.StatusOK, newHttpResponse(code, msg, ""))
