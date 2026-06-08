@@ -3,8 +3,12 @@ package gohera
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,8 +18,16 @@ import (
 )
 
 var config = viper.New()
-var configLoaded bool
 var configCache atomic.Pointer[map[string]any]
+
+var (
+	configSearchPaths = []string{"./", "./config", "./configs"}
+	configExtensions  = []string{".toml", ".yaml", ".yml", ".json", ".properties"}
+	defaultConfigName = "app"
+)
+
+var initConfigOnce sync.Once
+var initConfigErr error
 
 func init() {
 	// 尝试在包加载时初始化配置，以便包级别的变量初始化可以获取到配置
@@ -23,35 +35,117 @@ func init() {
 }
 
 // initAppConfig 初始化应用配置
-// 按照优先级从当前目录、./config、./configs 加载 app.toml/yaml/json 等配置文件
+// 扫描 ./、./config、./configs 目录，按优先级发现并加载配置文件
 func initAppConfig() error {
-	if configLoaded {
-		return nil
-	}
+	initConfigOnce.Do(func() {
+		path, err := discoverConfigFile()
+		if err != nil {
+			initConfigErr = err
+			return
+		}
 
-	config.SetConfigName("app")
-	config.AddConfigPath("./")
-	config.AddConfigPath("./config")
-	config.AddConfigPath("./configs")
+		config.SetConfigFile(path)
+		if initConfigErr = config.ReadInConfig(); initConfigErr != nil {
+			return
+		}
 
-	err := config.ReadInConfig()
-	if err != nil {
-		return err
-	}
+		config.SetEnvPrefix("APP")
+		config.AutomaticEnv()
+		config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	config.SetEnvPrefix("APP")
-	config.AutomaticEnv()
-	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		config.OnConfigChange(func(e fsnotify.Event) {
+			fmt.Printf("Config file changed: %s\n", e.Name)
+			_ = refreshCache()
+		})
+		config.WatchConfig()
 
-	config.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Printf("Config file changed: %s\n", e.Name)
 		_ = refreshCache()
 	})
-	config.WatchConfig()
+	return initConfigErr
+}
 
-	_ = refreshCache()
-	configLoaded = true
-	return nil
+// discoverConfigFile 按优先级发现配置文件：
+// 1. APP_CONFIG_FILE 指定绝对路径
+// 2. APP_CONFIG 或默认 app 作为文件名，在搜索路径中按扩展名匹配
+// 3. 某目录下仅有一个配置文件时使用该文件
+func discoverConfigFile() (string, error) {
+	if path := os.Getenv("APP_CONFIG_FILE"); path != "" {
+		if _, err := os.Stat(path); err != nil {
+			return "", fmt.Errorf("APP_CONFIG_FILE %q: %w", path, err)
+		}
+		return path, nil
+	}
+
+	preferredName := os.Getenv("APP_CONFIG")
+	if preferredName == "" {
+		preferredName = defaultConfigName
+	}
+
+	for _, dir := range configSearchPaths {
+		if path, ok := findConfigByName(dir, preferredName); ok {
+			return path, nil
+		}
+	}
+
+	if os.Getenv("APP_CONFIG") != "" {
+		return "", fmt.Errorf("config file %q not found in %v", preferredName, configSearchPaths)
+	}
+
+	for _, dir := range configSearchPaths {
+		candidates, err := listConfigFiles(dir)
+		if err != nil {
+			return "", err
+		}
+		switch len(candidates) {
+		case 0:
+			continue
+		case 1:
+			return candidates[0], nil
+		default:
+			return "", fmt.Errorf("multiple config files in %s: %v", dir, candidates)
+		}
+	}
+
+	return "", fmt.Errorf("no config file found in %v", configSearchPaths)
+}
+
+func findConfigByName(dir, name string) (string, bool) {
+	for _, ext := range configExtensions {
+		path := filepath.Join(dir, name+ext)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func listConfigFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var candidates []string
+	for _, entry := range entries {
+		if entry.IsDir() || !isConfigFile(entry.Name()) {
+			continue
+		}
+		candidates = append(candidates, filepath.Join(dir, entry.Name()))
+	}
+	sort.Strings(candidates)
+	return candidates, nil
+}
+
+func isConfigFile(name string) bool {
+	for _, ext := range configExtensions {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // refreshCache 刷新配置缓存，将所有配置扁平化存入 atomic.Pointer
