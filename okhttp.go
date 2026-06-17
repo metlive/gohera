@@ -46,6 +46,7 @@ type HTTPRequest struct {
 	ctx       context.Context
 	retries   int
 	params    url.Values
+	formData  url.Values // application/x-www-form-urlencoded form data
 	url       string
 	body      []byte
 	method    string
@@ -64,11 +65,12 @@ type HTTPRespone struct {
 // 默认 3秒超时，重试 1 次
 func NewRequest() *HTTPRequest {
 	return &HTTPRequest{
-		client:  defaultHTTPClient,
-		header:  make(http.Header),
-		params:  make(url.Values),
-		timeout: 3 * time.Second,
-		retries: 1,
+		client:   defaultHTTPClient,
+		header:   make(http.Header),
+		params:   make(url.Values),
+		formData: make(url.Values),
+		timeout:  3 * time.Second,
+		retries:  1,
 	}
 }
 
@@ -173,6 +175,25 @@ func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	return h
 }
 
+// SetFormData 添加单个 application/x-www-form-urlencoded 表单参数。
+// 适用于 POST/PUT 请求，内容类型自动设为 application/x-www-form-urlencoded。
+// 多次调用同名 key 会追加值。
+func (h *HTTPRequest) SetFormData(key string, value any) *HTTPRequest {
+	h.formData.Add(key, fmt.Sprintf("%v", value))
+	return h
+}
+
+// SetFormDataMap 批量设置 application/x-www-form-urlencoded 表单参数。
+// 与 resty 的 SetFormData(map[string]string) 行为一致。
+func (h *HTTPRequest) SetFormDataMap(data map[string]string) *HTTPRequest {
+	if len(data) > 0 {
+		for k, v := range data {
+			h.formData.Set(k, v)
+		}
+	}
+	return h
+}
+
 // Get 发起 GET 请求
 func (h *HTTPRequest) Get(reqUrl string) *HTTPRespone {
 	ctx := context.Background()
@@ -193,6 +214,27 @@ func (h *HTTPRequest) DeleteCtx(ctx context.Context, reqUrl string) *HTTPRespone
 	h.url = reqUrl
 	h.method = http.MethodDelete
 	return h.doRequest(ctx)
+}
+
+// Post 发起 POST 请求（无 Context，使用 Background）。
+// 需提前设置 body（如 GetCtx 不设置 body，Post 系列自动编码 formData）。
+func (h *HTTPRequest) Post(reqUrl string) *HTTPRespone {
+	ctx := context.Background()
+	return h.PostCtx(ctx, reqUrl)
+}
+
+// PostCtx 发起带 Context 的 POST 请求。
+// 需提前通过 SetFormDataMap 或 PostJsonCtx/PostFormCtx 等设置 body。
+func (h *HTTPRequest) PostCtx(ctx context.Context, reqUrl string) *HTTPRespone {
+	h.url = reqUrl
+	h.method = http.MethodPost
+	return h.doRequest(ctx)
+}
+
+// PostForm 发起 POST Form 请求（无 Context，使用 Background）。
+func (h *HTTPRequest) PostForm(reqUrl string, params map[string]any) *HTTPRespone {
+	ctx := context.Background()
+	return h.PostFormCtx(ctx, reqUrl, params)
 }
 
 // PostFormCtx 发起带 Context 的 POST Form 请求
@@ -333,6 +375,12 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 			}
 		}
 		u.RawQuery = q.Encode()
+	}
+
+	// 如果未显式设置 body 但有 formData，自动编码为 application/x-www-form-urlencoded
+	if len(h.body) == 0 && len(h.formData) > 0 {
+		h.header.Set("Content-Type", FormContentType)
+		h.body = []byte(h.formData.Encode())
 	}
 
 	Infotf(ctx, "request %v: %v", h.method, u.String())
