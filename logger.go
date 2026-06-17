@@ -26,6 +26,20 @@ type Trace struct {
 // 定义统一的日志写入方式
 var logger *zap.Logger
 
+// InitLogger 仅初始化日志组件，不依赖完整的 InitApp()。
+// 适用于引用方只需要 gohera 的 Info/Warn/Error 日志能力，
+// 但不需要 MySQL/Redis/配置等完整初始化的场景。
+// logPath 为日志文件目录路径，例如 "/var/log/trace/myapp"。
+func InitLogger(logPath string) {
+	initLoggerPool(loggerConfig{
+		FilePath:   logPath,
+		MaxSize:    0,
+		MaxBackups: 0,
+		Compress:   false,
+		Mode:       "",
+	})
+}
+
 type loggerConfig struct {
 	FilePath   string `json:"file_path"`
 	MaxSize    int    `json:"max_size"`
