@@ -33,20 +33,13 @@ type DB struct {
 }
 
 var (
-	dbMap    = make(map[string]*xorm.Engine)
-	dbMu     sync.RWMutex
-	instance *ConnectPool
-	once     sync.Once
+	dbMap = make(map[string]*xorm.Engine)
+	dbMu  sync.RWMutex
 )
 
 // InitOnce 初始化连接池单例
 func InitOnce(conf *Config) *ConnectPool {
-	once.Do(func() {
-		instance = &ConnectPool{
-			config: conf,
-		}
-	})
-	return instance
+	return &ConnectPool{config: conf}
 }
 
 // Connect 获取或创建数据库连接
@@ -66,7 +59,8 @@ func (o *ConnectPool) Connect() (*DB, error) {
 		return &DB{obj}, nil
 	}
 
-	var dataSource = fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=True&loc=Local", o.config.User, o.config.Password, o.config.Host, o.config.Database)
+	var dataSource = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local",
+		o.config.User, o.config.Password, o.config.Host, o.config.Port, o.config.Database)
 	var obj *xorm.Engine
 	obj, err := xorm.NewEngine("mysql", dataSource)
 	if err != nil {
