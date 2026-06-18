@@ -30,6 +30,7 @@ var logger *zap.Logger
 // 适用于引用方只需要 gohera 的 Info/Warn/Error 日志能力，
 // 但不需要 MySQL/Redis/配置等完整初始化的场景。
 // logPath 为日志文件目录路径，例如 "/var/log/trace/myapp"。
+// 注意：此函数默认不输出到控制台，如需控制台输出请使用 InitLoggerWithStdout。
 func InitLogger(logPath string) {
 	initLoggerPool(loggerConfig{
 		FilePath:   logPath,
@@ -40,12 +41,45 @@ func InitLogger(logPath string) {
 	})
 }
 
+// InitLoggerWithStdout 初始化日志组件，并支持控制是否输出到控制台。
+// enableStdout 为 true 时，日志同时输出到控制台（纯文本格式）和文件。
+// 控制台格式默认为 simple（仅消息内容），如需详细格式请使用 InitLoggerWithStdoutFormat。
+func InitLoggerWithStdout(logPath string, enableStdout bool) {
+	initLoggerPool(loggerConfig{
+		FilePath:     logPath,
+		MaxSize:      0,
+		MaxBackups:   0,
+		Compress:     false,
+		Mode:         "",
+		EnableStdout: enableStdout,
+	})
+}
+
+// InitLoggerWithStdoutFormat 初始化日志组件，支持控制台输出及格式。
+// enableStdout 为 true 时日志同时输出到控制台和文件。
+// stdoutFormat 控制控制台格式:
+//   - "simple":   仅输出消息内容（默认，适合简洁场景）
+//   - "detailed": 输出完整格式：[时间] 级别 [caller?] [traceId?] : 消息（终端下级别带颜色，空字段省略）
+func InitLoggerWithStdoutFormat(logPath string, enableStdout bool, stdoutFormat string) {
+	initLoggerPool(loggerConfig{
+		FilePath:     logPath,
+		MaxSize:      0,
+		MaxBackups:   0,
+		Compress:     false,
+		Mode:         "",
+		EnableStdout: enableStdout,
+		StdoutFormat: stdoutFormat,
+	})
+}
+
 type loggerConfig struct {
-	FilePath   string `json:"file_path"`
-	MaxSize    int    `json:"max_size"`
-	MaxBackups int    `json:"max_backups"`
-	Compress   bool   `json:"compress"`
-	Mode       string `json:"mode"` // 环境
+	FilePath     string `json:"file_path"`
+	MaxSize      int    `json:"max_size"`
+	MaxBackups   int    `json:"max_backups"`
+	Compress     bool   `json:"compress"`
+	Mode         string `json:"mode"`          // 环境
+	EnableStdout bool   `json:"enable_stdout"` // 是否输出到控制台
+	StdoutFormat string `json:"stdout_format"` // 控制台输出格式: "simple"(默认,仅消息) / "detailed"(带时间/级别/caller)
 }
 
 // initLoggerPool 初始化日志连接池
@@ -76,10 +110,14 @@ func initLoggerPool(config loggerConfig) {
 		getEncoderCore(fmt.Sprintf("./%s/server_error.log", config.FilePath), errorPriority, config),
 	}
 
-	// 新增：非正式环境添加控制台输出 (无格式纯文本)
-	if GetBool("log.stdout") {
+	// 控制台输出：优先使用配置字段 EnableStdout，否则回退到 GetBool("log.stdout")
+	if config.EnableStdout || GetBool("log.stdout") {
 		// 使用 zap.DebugLevel 允许输出 Debug 及以上所有级别日志
-		cores = append(cores, getConsoleCore(zap.DebugLevel))
+		if config.StdoutFormat == "detailed" {
+			cores = append(cores, getDetailedConsoleCore(zap.DebugLevel))
+		} else {
+			cores = append(cores, getConsoleCore(zap.DebugLevel))
+		}
 	}
 
 	filed := zap.Fields(
@@ -99,6 +137,99 @@ func getConsoleCore(level zapcore.LevelEnabler) zapcore.Core {
 
 	// 返回一个 cleanConsoleCore 实例，用于精简控制台日志输出（忽略添加的字段，只输出 msg 字段的内容）
 	return &cleanConsoleCore{Core: core}
+}
+
+// getDetailedConsoleCore 获取控制台输出 Core (详细格式)
+// 输出格式: [时间] 级别 [caller?] [traceId?] : 消息（caller/trace 为空时省略）
+func getDetailedConsoleCore(level zapcore.LevelEnabler) zapcore.Core {
+	return &detailedConsoleCore{
+		useColor: consoleColorEnabled(),
+		Core: zapcore.NewCore(
+			zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
+				TimeKey:        "T",
+				LevelKey:       "L",
+				NameKey:        "N",
+				CallerKey:      "C",
+				MessageKey:     "M",
+				StacktraceKey:  "S",
+				LineEnding:     zapcore.DefaultLineEnding,
+				EncodeLevel:    zapcore.CapitalLevelEncoder,
+				EncodeTime:     detailedTimeEncoder,
+				EncodeDuration: zapcore.SecondsDurationEncoder,
+				EncodeCaller:   zapcore.ShortCallerEncoder,
+				EncodeName:     zapcore.FullNameEncoder,
+			}),
+			zapcore.AddSync(os.Stdout),
+			level,
+		),
+	}
+}
+
+// detailedTimeEncoder 格式化时间为 [2006-01-02 15:04:05.000]
+func detailedTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+	enc.AppendString("[" + t.Format("2006-01-02 15:04:05.000") + "]")
+}
+
+// detailedConsoleCore 自定义 Core，实现目标格式输出
+// 格式: [时间] LEVEL [caller?] [traceId?] : 消息
+type detailedConsoleCore struct {
+	zapcore.Core
+	useColor bool
+}
+
+func (c *detailedConsoleCore) With(fields []zapcore.Field) zapcore.Core {
+	return &detailedConsoleCore{Core: c.Core.With(fields), useColor: c.useColor}
+}
+
+func (c *detailedConsoleCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(ent.Level) {
+		return ce.AddCore(ent, c)
+	}
+	return ce
+}
+
+func (c *detailedConsoleCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	buf := make([]byte, 0, 256)
+
+	// [时间]
+	buf = append(buf, '[')
+	buf = ent.Time.AppendFormat(buf, "2006-01-02 15:04:05.000")
+	buf = append(buf, ']')
+
+	// 级别（终端下带颜色）
+	buf = append(buf, ' ')
+	buf = append(buf, colorizeLevel(ent.Level, c.useColor)...)
+
+	// [caller] - 有 caller 时才输出
+	if ent.Caller.Defined {
+		buf = append(buf, ' ', '[')
+		buf = append(buf, ent.Caller.TrimmedPath()...)
+		buf = append(buf, ']')
+	}
+
+	// [traceId] - 有 trace 时才输出
+	if traceID := extractTraceID(fields); traceID != "" {
+		buf = append(buf, ' ', '[')
+		buf = append(buf, traceID...)
+		buf = append(buf, ']')
+	}
+
+	// : message
+	buf = append(buf, ' ', ':', ' ')
+	buf = append(buf, ent.Message...)
+	buf = append(buf, '\n')
+
+	_, err := os.Stdout.Write(buf)
+	return err
+}
+
+func extractTraceID(fields []zapcore.Field) string {
+	for _, f := range fields {
+		if f.Key == "x_trace_id" {
+			return f.String
+		}
+	}
+	return ""
 }
 
 type cleanConsoleCore struct {
