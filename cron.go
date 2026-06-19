@@ -3,7 +3,6 @@ package gohera
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"github.com/robfig/cron/v3"
 )
