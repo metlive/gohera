@@ -163,7 +163,7 @@ func (h *HTTPRequest) SetReferer(referer string) *HTTPRequest {
 	return h
 }
 
-// SetRetries 设置重试次数 (0: 不重试, -1: 无限重试, >0: 重试次数)
+// SetRetries 设置重试次数 (0: 不重试, -1: 无限重试(上限10次), >0: 重试次数)
 func (h *HTTPRequest) SetRetries(times int) *HTTPRequest {
 	h.retries = times
 	return h
@@ -404,7 +404,8 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 	h.client.Timeout = h.timeout
 
 	var resp *http.Response
-	for i := 0; h.retries == -1 || i <= h.retries; i++ {
+	const maxRetries = 10
+	for i := 0; ; i++ {
 		if i > 0 {
 			Infotf(newCtx, "retry request %v: %v, times: %d", h.method, u.String(), i)
 		}
@@ -412,8 +413,16 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 		if err == nil {
 			break
 		}
+		// 检查 context 是否已取消或超时
 		if newCtx.Err() != nil {
 			return &HTTPRespone{Error: newCtx.Err()}
+		}
+		// 达到重试上限时退出；-1 表示无限重试，但受 maxRetries 硬上限保护
+		if h.retries >= 0 && i >= h.retries {
+			break
+		}
+		if i >= maxRetries {
+			break
 		}
 	}
 

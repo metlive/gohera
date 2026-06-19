@@ -96,7 +96,7 @@ func (r *Client) int(cmd string, args ...any) (int, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Int(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return 0, nil
 	}
 
@@ -115,7 +115,7 @@ func (r *Client) int64(cmd string, args ...any) (int64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Int64(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return 0, nil
 	}
 
@@ -134,7 +134,7 @@ func (r *Client) uint64(cmd string, args ...any) (uint64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Uint64(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return 0, nil
 	}
 
@@ -153,7 +153,7 @@ func (r *Client) float64(cmd string, args ...any) (float64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Float64(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return 0, nil
 	}
 
@@ -172,7 +172,7 @@ func (r *Client) string(cmd string, args ...any) (string, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.String(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return "", nil
 	}
 
@@ -191,7 +191,7 @@ func (r *Client) bytes(cmd string, args ...any) ([]byte, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Bytes(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -210,7 +210,7 @@ func (r *Client) bool(cmd string, args ...any) (bool, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Bool(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return false, nil
 	}
 
@@ -229,7 +229,7 @@ func (r *Client) values(cmd string, args ...any) ([]any, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Values(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -248,7 +248,7 @@ func (r *Client) float64s(cmd string, args ...any) ([]float64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Float64s(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -267,7 +267,7 @@ func (r *Client) strings(cmd string, args ...any) ([]string, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Strings(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -286,7 +286,7 @@ func (r *Client) byteSlices(cmd string, args ...any) ([][]byte, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.ByteSlices(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -305,7 +305,7 @@ func (r *Client) int64s(cmd string, args ...any) ([]int64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Int64s(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -324,7 +324,7 @@ func (r *Client) ints(cmd string, args ...any) ([]int, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Ints(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -343,7 +343,7 @@ func (r *Client) stringMap(cmd string, args ...any) (map[string]string, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.StringMap(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -362,7 +362,7 @@ func (r *Client) intMap(cmd string, args ...any) (map[string]int, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.IntMap(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -381,7 +381,7 @@ func (r *Client) int64Map(cmd string, args ...any) (map[string]int64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Int64Map(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 
@@ -400,7 +400,7 @@ func (r *Client) positions(cmd string, args ...any) ([]*[2]float64, error) {
 
 	reply, e := conn.Do(cmd, args...)
 	v, err := redis.Positions(reply, e)
-	if errors.As(err, &redis.ErrNil) {
+	if errors.Is(err, redis.ErrNil) {
 		return nil, nil
 	}
 

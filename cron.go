@@ -3,9 +3,6 @@ package gohera
 import (
 	"context"
 	"strings"
-	"sync"
-
-	"github.com/robfig/cron/v3"
 )
 
 //执行任务格式举例         			 格式
@@ -33,11 +30,10 @@ import (
 type HandlerFunc func()
 
 type Manager struct {
-	run          *cron.Cron
-	sepc         string
-	jobName      string
-	jobFunc      HandlerFunc
-	handlerMutex sync.Mutex
+	run     *cron.Cron
+	sepc    string
+	jobName string
+	jobFunc HandlerFunc
 }
 
 // NewJobManager 创建定时任务管理器
@@ -47,13 +43,14 @@ func NewJobManager() *Manager {
 	}
 }
 
-// Command 设置当前任务的名称和处理函数
+// Command 创建一个新的定时任务配置，返回独立的 *Manager 实例。
+// 每次调用返回新实例，避免链式调用时的状态覆盖问题。
 func (m *Manager) Command(jobName string, jobFunc func()) *Manager {
-	m.handlerMutex.Lock()
-	defer m.handlerMutex.Unlock()
-	m.jobName = jobName
-	m.jobFunc = jobFunc
-	return m
+	return &Manager{
+		run:     m.run,
+		jobName: jobName,
+		jobFunc: jobFunc,
+	}
 }
 
 func (m *Manager) schedule(sepc string, jobName string, jobFunc func()) {

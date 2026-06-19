@@ -25,21 +25,25 @@ func HandlerRecovery(stack bool) gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				var brokenPipe bool
-				var ne *net.OpError
-				if errors.As(err.(error), &ne) {
-					var se *os.SyscallError
-					if errors.As(ne.Err, &se) {
-						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
-							brokenPipe = true
+				// 安全类型断言：panic 的值可能不是 error 类型（如 panic(42)、panic("str")）
+				if e, ok := err.(error); ok {
+					var ne *net.OpError
+					if errors.As(e, &ne) {
+						var se *os.SyscallError
+						if errors.As(ne.Err, &se) {
+							if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
+								brokenPipe = true
+							}
 						}
 					}
 				}
 				pe := &panicEx{}
-				pe.Err = fmt.Sprintf("%s", err)
+				pe.Err = fmt.Sprintf("%v", err)
 				if brokenPipe {
 					pJson, _ := json.Marshal(pe)
 					Error(c, string(pJson), nil)
 					JsonAbort(c, ErrSystem, pe.Err)
+					return
 				}
 
 				httpRequest, _ := httputil.DumpRequest(c.Request, false)

@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"github.com/metlive/gohera/mysql"
 	"github.com/metlive/gohera/redis"
-	"github.com/metlive/gohera/validator"
 )
 
 var env = flag.String("env", DeployEnvDev, "The environment for app run")
@@ -77,25 +74,6 @@ func InitApp() (router *gin.Engine) {
 		}
 	}
 
-	engine := gin.New()
-	// 初始化上下文
-	engine.Use(TraceContext())
-	// 异常捕获
-	if !IsDev() {
-		engine.Use(HandlerRecovery(true))
-	}
-	// 记录请求日志
-	registerRouter(engine)
-
-	// 是否需要开启pprof
-	prof := GetInt("zhttp.pprof")
-	if prof == 1 {
-		pprof.Register(engine)
-	}
-
-	// 数字不要解析成float64
-	binding.EnableDecoderUseNumber = true
-	// 注册自定义参数验证
-	binding.Validator = new(validator.DefaultValidator)
+	engine := InitEngine()
 	return engine
 }

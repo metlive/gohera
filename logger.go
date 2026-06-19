@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,10 @@ type Trace struct {
 }
 
 // 定义统一的日志写入方式
-var logger *zap.Logger
+var (
+	logger   *zap.Logger
+	loggerMu sync.Mutex
+)
 
 // InitLogger 仅初始化日志组件，不依赖完整的 InitApp()。
 // 适用于引用方只需要 gohera 的 Info/Warn/Error 日志能力，
@@ -125,7 +129,9 @@ func initLoggerPool(config loggerConfig) {
 		zap.String("x_project", GetString("http.service")),
 	)
 	core := zapcore.NewTee(cores...)
+	loggerMu.Lock()
 	logger = zap.New(core, filed).WithOptions(zap.AddCallerSkip(1))
+	loggerMu.Unlock()
 }
 
 // getConsoleCore 获取控制台输出 Core (极简格式)
@@ -259,13 +265,17 @@ func (c *cleanConsoleCore) Write(ent zapcore.Entry, fields []zapcore.Field) erro
 // 负责配置日志文件的切割、格式（JSON）及输出级别
 func getEncoderCore(fileName string, level zapcore.LevelEnabler, config loggerConfig) (core zapcore.Core) {
 	// 每小时一个文件
-	logf, _ := rotatelogs.New(fileName+"_%Y-%m-%d",
+	logf, err := rotatelogs.New(fileName+"_%Y-%m-%d",
 		rotatelogs.WithLinkName(fileName),
 		rotatelogs.WithMaxAge(7*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),
 	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[gohera] failed to create rotatelogs for %s: %v\n", fileName, err)
+		panic(fmt.Errorf("failed to create log file %s: %w", fileName, err))
+	}
 
-	// 修改处：不再包含 os.Stdout，只写入文件
+	// 文件输出，不包含 stdout
 	writer := zapcore.AddSync(logf)
 
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zapcore.EncoderConfig{
@@ -303,6 +313,7 @@ func GetTraceContext(ctx context.Context) *Trace {
 
 // getContextFields 从 Context 中提取 Trace 信息并转换为 zap 字段
 // 包含 trace_id, span_id, user_id, path, status 等信息
+// 注意：敏感 Header（Authorization、Cookie 等）会被脱敏处理
 func getContextFields(ctx context.Context) []zap.Field {
 	if ctx == nil {
 		ctx = context.Background()
@@ -314,7 +325,7 @@ func getContextFields(ctx context.Context) []zap.Field {
 	zapFiled = append(zapFiled, zap.Int("x_user_id", Ternary[int](traceInfo.UserId == 0, 0, traceInfo.UserId)))
 	zapFiled = append(zapFiled, zap.String("x_path", traceInfo.Path))
 	zapFiled = append(zapFiled, zap.Int("x_status", traceInfo.Status))
-	zapFiled = append(zapFiled, zap.Any("x_header", traceInfo.Headers))
+	zapFiled = append(zapFiled, zap.Any("x_header", maskSensitiveHeaders(traceInfo.Headers)))
 	return zapFiled
 }
 
@@ -403,4 +414,31 @@ func (l *ContextLogger) Error(args ...any) {
 // Errortf 输出带格式化的 Error 级别日志 (使用绑定的 Context)
 func (l *ContextLogger) Errortf(template string, args ...any) {
 	Errortf(l.ctx, template, args...)
+}
+
+// sensitiveHeaders 定义需要在日志中脱敏的 HTTP Header 名称（大小写不敏感）
+var sensitiveHeaders = map[string]bool{
+	"authorization":    true,
+	"cookie":           true,
+	"set-cookie":       true,
+	"x-api-key":        true,
+	"x-csrf-token":     true,
+	"x-xsrf-token":     true,
+	"proxy-authorization": true,
+}
+
+// maskSensitiveHeaders 对敏感的 Header 值进行脱敏，防止密钥泄露到日志文件
+func maskSensitiveHeaders(headers map[string]any) map[string]any {
+	if len(headers) == 0 {
+		return headers
+	}
+	result := make(map[string]any, len(headers))
+	for k, v := range headers {
+		if sensitiveHeaders[strings.ToLower(k)] {
+			result[k] = "***"
+		} else {
+			result[k] = v
+		}
+	}
+	return result
 }

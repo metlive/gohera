@@ -69,12 +69,13 @@ func CorsContext() gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Headers", headerStr)
 			c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 			c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
-			c.Header("Access-Control-Allow-Credentials", "true")
+			// 注意：Access-Control-Allow-Credentials 不能与 "Access-Control-Allow-Origin: *" 同时使用
+			// 生产环境建议替换此中间件，使用白名单方式限制具体来源域名
 		}
 
 		// 放行所有OPTIONS方法
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatusJSON(http.StatusNoContent, "WeclassRoom Request Options")
+			c.AbortWithStatus(http.StatusNoContent)
 		}
 		c.Next()
 	}

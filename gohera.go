@@ -40,7 +40,7 @@ func StartupService(engine *gin.Engine) {
 	}()
 	var state int32 = 1
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	select {
 	case err := <-ac:
 		if err != nil && atomic.LoadInt32(&state) == 1 {

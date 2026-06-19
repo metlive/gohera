@@ -31,7 +31,9 @@ var initConfigErr error
 
 func init() {
 	// 尝试在包加载时初始化配置，以便包级别的变量初始化可以获取到配置
-	_ = initAppConfig()
+	if err := initAppConfig(); err != nil {
+		fmt.Fprintf(os.Stderr, "[gohera] config init warning: %v\n", err)
+	}
 }
 
 // initAppConfig 初始化应用配置
