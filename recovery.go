@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metlive/gohera/logger"
 )
 
 type panicEx struct {
@@ -41,7 +42,7 @@ func HandlerRecovery(stack bool) gin.HandlerFunc {
 				pe.Err = fmt.Sprintf("%v", err)
 				if brokenPipe {
 					pJson, _ := json.Marshal(pe)
-					Error(c, string(pJson), nil)
+					logger.Error(c, string(pJson), nil)
 					JsonAbort(c, ErrSystem, pe.Err)
 					return
 				}
@@ -57,7 +58,7 @@ func HandlerRecovery(stack bool) gin.HandlerFunc {
 					pe.Stack = stack2
 				}
 				pJson, _ := json.Marshal(pe)
-				Error(c, string(pJson), nil)
+				logger.Error(c, string(pJson), nil)
 				JsonAbort(c, ErrSystem, pe.Err)
 			}
 		}()

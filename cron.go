@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/metlive/gohera/logger"
 	"github.com/robfig/cron/v3"
 )
 
@@ -59,9 +60,9 @@ func (m *Manager) schedule(sepc string, jobName string, jobFunc func()) {
 	ctx := context.Background()
 	_, err := m.run.AddFunc(sepc, jobFunc)
 	if err != nil {
-		Errortf(ctx, "schedule %s run error", jobName)
+		logger.Errortf(ctx, "schedule %s run error", jobName)
 	}
-	Infotf(ctx, "schedule job name %v", jobName)
+	logger.Infotf(ctx, "schedule job name %v", jobName)
 }
 
 // Stop 停止定时任务

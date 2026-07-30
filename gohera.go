@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metlive/gohera/logger"
 )
 
 // StartupOption 启动选项函数
@@ -77,7 +78,7 @@ func StartupService(engine *gin.Engine, opts ...StartupOption) {
 	select {
 	case err := <-ac:
 		if err != nil && atomic.LoadInt32(&state) == 1 {
-			Error(context.Background(), "监听HTTP服务发生错误: %v", err.Error())
+			logger.Error(context.Background(), "监听HTTP服务发生错误: %v", err.Error())
 			panic(fmt.Sprintf("监听HTTP服务发生错误: %v", err.Error()))
 		}
 	case sig := <-quit:

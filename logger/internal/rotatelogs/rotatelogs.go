@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/metlive/gohera/rotatelogs/strftime"
+	"github.com/metlive/gohera/logger/internal/rotatelogs/strftime"
 	"github.com/pkg/errors"
 )
 

@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -9,17 +11,23 @@ import (
 	"xorm.io/xorm/names"
 )
 
-// Config SQLite 配置
+const (
+	DefaultMaxIdleConns = 5
+	DefaultMaxOpenConns = 10
+)
+
+// Config SQLite 配置（三方可直接构造，不依赖 gohera）。
 type Config struct {
-	FilePath     string `toml:"file_path"`      // 数据库文件路径
-	MaxOpenConns int    `toml:"max_open_conns"` // 设置打开连接到数据库的最大数量
-	MaxIdleConns int    `toml:"max_idle_conns"` // 设置空闲连接池中的最大连接数
-	ShowSQL      bool   `toml:"show_sql"`       // 是否开启 SQL 日志
+	FilePath     string `toml:"file_path"`
+	MaxOpenConns int    `toml:"max_open_conns"`
+	MaxIdleConns int    `toml:"max_idle_conns"`
+	ShowSQL      bool   `toml:"show_sql"`
 }
 
-// DB 数据库连接，嵌入 xorm.Engine
+// DB 数据库连接，嵌入 xorm.Engine。
 type DB struct {
 	*xorm.Engine
+	name string // 缓存键（FilePath）
 }
 
 var (
@@ -27,43 +35,90 @@ var (
 	dbMu  sync.RWMutex
 )
 
-// New 创建或获取 SQLite 数据库连接
-// 相同 filePath 会复用已有连接
+// New 创建或复用 SQLite 连接。相同 FilePath 全局复用。
 func New(cfg *Config) (*DB, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("sqlite: config is nil")
+	}
+	if err := cfg.validateAndNormalize(); err != nil {
+		return nil, err
+	}
+
 	dbMu.RLock()
 	if obj, ok := dbMap[cfg.FilePath]; ok {
 		dbMu.RUnlock()
-		return &DB{obj}, nil
+		return &DB{Engine: obj, name: cfg.FilePath}, nil
 	}
 	dbMu.RUnlock()
 
 	dbMu.Lock()
 	defer dbMu.Unlock()
 
-	// Double check
 	if obj, ok := dbMap[cfg.FilePath]; ok {
-		return &DB{obj}, nil
+		return &DB{Engine: obj, name: cfg.FilePath}, nil
 	}
 
 	obj, err := xorm.NewEngine("sqlite3", cfg.FilePath)
 	if err != nil {
 		return nil, err
 	}
+	if err = obj.DB().Ping(); err != nil {
+		_ = obj.Close()
+		return nil, err
+	}
 
-	if cfg.MaxIdleConns > 0 {
-		obj.DB().SetMaxIdleConns(cfg.MaxIdleConns)
-	}
-	if cfg.MaxOpenConns > 0 {
-		obj.DB().SetMaxOpenConns(cfg.MaxOpenConns)
-	}
+	obj.DB().SetMaxIdleConns(cfg.MaxIdleConns)
+	obj.DB().SetMaxOpenConns(cfg.MaxOpenConns)
 	obj.SetMapper(names.GonicMapper{})
 	obj.ShowSQL(cfg.ShowSQL)
 
 	dbMap[cfg.FilePath] = obj
-	return &DB{obj}, nil
+	return &DB{Engine: obj, name: cfg.FilePath}, nil
 }
 
-// Context 返回带有上下文的 Session
+func (c *Config) validateAndNormalize() error {
+	if strings.TrimSpace(c.FilePath) == "" {
+		return fmt.Errorf("sqlite: file_path is required")
+	}
+	if c.MaxIdleConns <= 0 {
+		c.MaxIdleConns = DefaultMaxIdleConns
+	}
+	if c.MaxOpenConns <= 0 {
+		c.MaxOpenConns = DefaultMaxOpenConns
+	}
+	return nil
+}
+
+// Close 关闭本连接并从缓存移除。
+func (db *DB) Close() error {
+	if db == nil || db.Engine == nil {
+		return nil
+	}
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	if db.name != "" {
+		if cur, ok := dbMap[db.name]; ok && cur == db.Engine {
+			delete(dbMap, db.name)
+		}
+	}
+	return db.Engine.Close()
+}
+
+// CloseAll 关闭所有缓存中的 SQLite 连接。
+func CloseAll() error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	var firstErr error
+	for name, eng := range dbMap {
+		if err := eng.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		delete(dbMap, name)
+	}
+	return firstErr
+}
+
+// Context 返回带有上下文的 Session。
 func (db *DB) Context(ctx context.Context) *Session {
 	return &Session{db.Engine.Context(ctx)}
 }

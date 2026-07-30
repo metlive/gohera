@@ -1,4 +1,4 @@
-package gohera
+package logger
 
 import (
 	"os"

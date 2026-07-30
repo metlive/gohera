@@ -2,8 +2,9 @@ package strftime
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // because there is no such thing was a sync.RWLocker

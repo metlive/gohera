@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/metlive/gohera/logger"
 )
 
 // TraceContext 生成链路追踪 ID 的中间件
@@ -28,14 +29,14 @@ func TraceContext() gin.HandlerFunc {
 		if spanID == "" {
 			spanID = SpanIdDefault
 		}
-		t := &Trace{
+		t := &logger.Trace{
 			TraceId: traceID,
 			SpanId:  spanID,
 			UserId:  c.GetInt(UserId),
 			Method:  c.Request.Method,
 			Path:    c.Request.URL.Host + c.Request.URL.Path,
 			Status:  c.Writer.Status(),
-			Headers: getHeader(c.Request.Header),
+			Headers: GetHeader(c.Request.Header),
 		}
 		c.Set(TraceCtx, t)
 		// 将 Trace 信息注入到 Request 的 Context 中，以便在非 Gin 环境下（如 Service 层）也能获取

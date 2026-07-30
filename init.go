@@ -6,7 +6,9 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metlive/gohera/logger"
 	"github.com/metlive/gohera/mysql"
+	"github.com/metlive/gohera/okhttp"
 	"github.com/metlive/gohera/redis"
 )
 
@@ -31,15 +33,23 @@ func InitApp() (router *gin.Engine) {
 		panic(fmt.Errorf("init config fail ：  %s \n", err))
 	}
 
-	// 初始化日志处理器
+	// 初始化日志：从配置桥接到独立 logger 包（可覆盖此前仅控制台的 Init）
 	appPath := GetDefaultString("log.path", DefaultLogPath)
-	initLoggerPool(loggerConfig{
-		FilePath:   appPath + "/" + appName,
-		MaxSize:    0,
-		MaxBackups: 0,
-		Compress:   false,
-		Mode:       "",
-	})
+	filePath := appPath + "/" + appName
+	opts := logger.Options{
+		FilePath: filePath,
+		Project:  GetString("http.service"),
+	}
+	// 未配置 log.stdout 时显式关闭控制台，贴近生产默认只写文件
+	if IsSet("log.stdout") {
+		opts.EnableStdout = logger.Bool(GetBool("log.stdout"))
+	} else {
+		opts.EnableStdout = logger.Bool(false)
+	}
+	logger.Init(opts)
+
+	// 桥接服务名到 okhttp（Referer 等）；三方未走 InitApp 时可自行 SetDefaultService
+	okhttp.SetDefaultService(GetString("http.service"))
 
 	// mysql初始化
 	if IsSet("mysql") {
@@ -52,7 +62,7 @@ func InitApp() (router *gin.Engine) {
 				}
 				Mysql[key] = func(conf *mysql.Config) *mysql.DB {
 					conf.Env = GetEnv()
-					imysql, err := mysql.InitOnce(conf).Connect()
+					imysql, err := mysql.New(conf)
 					if err != nil {
 						panic(fmt.Errorf("unable to connect fail ：  %s \n", err))
 					}

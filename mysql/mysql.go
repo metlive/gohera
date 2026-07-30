@@ -12,24 +12,36 @@ import (
 	"xorm.io/xorm/names"
 )
 
+const (
+	DefaultMaxIdleConns = 10
+	DefaultMaxOpenConns = 50
+	DefaultMaxLifeTime  = 30 * time.Minute
+)
+
+// Config MySQL 连接配置（三方可直接构造，不依赖 gohera）。
 type Config struct {
-	MaxLifeTime  time.Duration `toml:"max_life_time"`  // 设置连接可以被重新使用的最大时间量
-	MaxOpenConns int           `toml:"max_open_conns"` // 设置打开连接到数据库的最大数量
-	MaxIdleConns int           `toml:"max_idle_conns"` // 设置空闲连接池中的最大连接数
-	User         string        `toml:"user"`           // 用户名
-	Password     string        `toml:"password"`       // 密码
-	Host         string        `toml:"host"`           // 数据库地址
-	Port         int           `toml:"port"`           // 端口
-	Database     string        `toml:"database"`       // 连接那个数据库
-	Env          string
+	MaxLifeTime  time.Duration `toml:"max_life_time"`  // 连接可被重用的最长时间
+	MaxOpenConns int           `toml:"max_open_conns"` // 最大打开连接数
+	MaxIdleConns int           `toml:"max_idle_conns"` // 空闲池最大连接数
+	User         string        `toml:"user"`
+	Password     string        `toml:"password"`
+	Host         string        `toml:"host"`
+	Port         int           `toml:"port"`
+	Database     string        `toml:"database"`
+	Env          string        // DEV/TEST 时默认开 ShowSQL（可被 ShowSQL 覆盖）
+	ShowSQL      *bool         // 显式控制 SQL 日志；nil 时回退 Env
+	Charset      string        `toml:"charset"` // 默认 utf8
 }
 
-// 变量初始化
+// ConnectPool 兼容旧 API，内部仅持有配置。
 type ConnectPool struct {
 	config *Config
 }
+
+// DB 数据库连接，嵌入 xorm.Engine。
 type DB struct {
 	*xorm.Engine
+	name string // 缓存键（Database）
 }
 
 var (
@@ -37,57 +49,137 @@ var (
 	dbMu  sync.RWMutex
 )
 
-// InitOnce 初始化连接池单例
-func InitOnce(conf *Config) *ConnectPool {
-	return &ConnectPool{config: conf}
-}
+// New 创建或复用 MySQL 连接。相同 Database 名全局复用。
+func New(cfg *Config) (*DB, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("mysql: config is nil")
+	}
+	if err := cfg.validateAndNormalize(); err != nil {
+		return nil, err
+	}
 
-// Connect 获取或创建数据库连接
-func (o *ConnectPool) Connect() (*DB, error) {
 	dbMu.RLock()
-	if obj, ok := dbMap[o.config.Database]; ok {
+	if obj, ok := dbMap[cfg.Database]; ok {
 		dbMu.RUnlock()
-		return &DB{obj}, nil
+		return &DB{Engine: obj, name: cfg.Database}, nil
 	}
 	dbMu.RUnlock()
 
 	dbMu.Lock()
 	defer dbMu.Unlock()
 
-	// Double check
-	if obj, ok := dbMap[o.config.Database]; ok {
-		return &DB{obj}, nil
+	if obj, ok := dbMap[cfg.Database]; ok {
+		return &DB{Engine: obj, name: cfg.Database}, nil
 	}
 
-	var dataSource = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local",
-		o.config.User, o.config.Password, o.config.Host, o.config.Port, o.config.Database)
-	var obj *xorm.Engine
-	obj, err := xorm.NewEngine("mysql", dataSource)
+	charset := cfg.Charset
+	if charset == "" {
+		charset = "utf8"
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=Local",
+		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, charset)
+
+	obj, err := xorm.NewEngine("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
-	err = obj.DB().Ping()
-	if err != nil {
+	if err = obj.DB().Ping(); err != nil {
+		_ = obj.Close()
 		return nil, err
 	}
 
-	// 设置空闲连接池中的最大连接数
-	obj.DB().SetMaxIdleConns(o.config.MaxIdleConns)
-	// 设置数据库连接最大打开数
-	obj.DB().SetMaxOpenConns(o.config.MaxOpenConns)
-	// 设置可重用连接的最长时间，一定要小于mysql服务端的保持超时时间，否则可能会被服务端关闭
-	obj.DB().SetConnMaxLifetime(o.config.MaxLifeTime)
+	obj.DB().SetMaxIdleConns(cfg.MaxIdleConns)
+	obj.DB().SetMaxOpenConns(cfg.MaxOpenConns)
+	obj.DB().SetConnMaxLifetime(cfg.MaxLifeTime)
 	obj.SetMapper(names.GonicMapper{})
-	// 非生产环境开启sql日志
-	if strings.ToUpper(o.config.Env) == "DEV" || strings.ToUpper(o.config.Env) == "TEST" {
-		obj.ShowSQL(true)
+
+	showSQL := cfg.resolveShowSQL()
+	obj.ShowSQL(showSQL)
+	if strings.EqualFold(cfg.Env, "DEV") || strings.EqualFold(cfg.Env, "TEST") {
+		// 开发/测试缩短连接寿命，便于热配
 		obj.DB().SetConnMaxLifetime(1 * time.Minute)
 	}
-	dbMap[o.config.Database] = obj
-	return &DB{obj}, nil
+
+	dbMap[cfg.Database] = obj
+	return &DB{Engine: obj, name: cfg.Database}, nil
 }
 
-// Context 返回带有上下文的 Session
+func (c *Config) validateAndNormalize() error {
+	if strings.TrimSpace(c.Host) == "" {
+		return fmt.Errorf("mysql: host is required")
+	}
+	if strings.TrimSpace(c.Database) == "" {
+		return fmt.Errorf("mysql: database is required")
+	}
+	if strings.TrimSpace(c.User) == "" {
+		return fmt.Errorf("mysql: user is required")
+	}
+	if c.Port <= 0 {
+		c.Port = 3306
+	}
+	if c.MaxIdleConns <= 0 {
+		c.MaxIdleConns = DefaultMaxIdleConns
+	}
+	if c.MaxOpenConns <= 0 {
+		c.MaxOpenConns = DefaultMaxOpenConns
+	}
+	if c.MaxLifeTime <= 0 {
+		c.MaxLifeTime = DefaultMaxLifeTime
+	}
+	return nil
+}
+
+func (c *Config) resolveShowSQL() bool {
+	if c.ShowSQL != nil {
+		return *c.ShowSQL
+	}
+	env := strings.ToUpper(c.Env)
+	return env == "DEV" || env == "TEST"
+}
+
+// Bool 便于填写 Config.ShowSQL。
+func Bool(v bool) *bool { return &v }
+
+// InitOnce 兼容旧入口，等价于持有配置后调用 Connect→New。
+func InitOnce(conf *Config) *ConnectPool {
+	return &ConnectPool{config: conf}
+}
+
+// Connect 获取或创建数据库连接（兼容旧 API）。
+func (o *ConnectPool) Connect() (*DB, error) {
+	return New(o.config)
+}
+
+// Close 关闭本连接并从缓存移除。
+func (db *DB) Close() error {
+	if db == nil || db.Engine == nil {
+		return nil
+	}
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	if db.name != "" {
+		if cur, ok := dbMap[db.name]; ok && cur == db.Engine {
+			delete(dbMap, db.name)
+		}
+	}
+	return db.Engine.Close()
+}
+
+// CloseAll 关闭所有缓存中的 MySQL 连接。
+func CloseAll() error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	var firstErr error
+	for name, eng := range dbMap {
+		if err := eng.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		delete(dbMap, name)
+	}
+	return firstErr
+}
+
+// Context 返回带有上下文的 Session。
 func (db *DB) Context(ctx context.Context) *Session {
 	return &Session{db.Engine.Context(ctx)}
 }

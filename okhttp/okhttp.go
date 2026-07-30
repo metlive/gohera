@@ -1,4 +1,4 @@
-package gohera
+package okhttp
 
 import (
 	"bytes"
@@ -14,10 +14,20 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/metlive/gohera/logger"
+)
+
+// 与 gohera 历史字面量保持一致，便于独立使用且与框架互通。
+const (
+	FormContentType = "application/x-www-form-urlencoded"
+	JsonContentType = "application/json"
+	TraceId         = "x-trace-id"
+	SpanId          = "x-span-id"
 )
 
 var (
@@ -35,7 +45,25 @@ var (
 			MaxIdleConnsPerHost:   20,
 		},
 	}
+
+	defaultServiceMu sync.RWMutex
+	defaultService   string
 )
+
+// SetDefaultService 设置包级默认服务名（Referer 回退等）。
+// gohera.InitApp 会桥接 http.service；三方也可自行调用。
+func SetDefaultService(name string) {
+	defaultServiceMu.Lock()
+	defaultService = name
+	defaultServiceMu.Unlock()
+}
+
+// DefaultService 返回包级默认服务名。
+func DefaultService() string {
+	defaultServiceMu.RLock()
+	defer defaultServiceMu.RUnlock()
+	return defaultService
+}
 
 type HTTPRequest struct {
 	client    *http.Client
@@ -50,6 +78,7 @@ type HTTPRequest struct {
 	url       string
 	body      []byte
 	method    string
+	service   string // 单请求覆盖 DefaultService；空则用包级默认
 }
 
 type HTTPRespone struct {
@@ -58,7 +87,7 @@ type HTTPRespone struct {
 	responseHeader http.Header
 	responseCookie []*http.Cookie
 	bytes          []byte
-	Error          error // 改为导出字段或保持兼容性，但计划中提到导出或提供更好访问
+	Error          error
 }
 
 // NewRequest 创建一个新的 HTTPRequest 实例
@@ -169,6 +198,32 @@ func (h *HTTPRequest) SetRetries(times int) *HTTPRequest {
 	return h
 }
 
+// SetService 设置本请求使用的服务名（覆盖包级 DefaultService）。
+func (h *HTTPRequest) SetService(name string) *HTTPRequest {
+	h.service = name
+	return h
+}
+
+func (h *HTTPRequest) resolveService() string {
+	if h.service != "" {
+		return h.service
+	}
+	return DefaultService()
+}
+
+// headerToMap 将 http.Header 转为 map[string]any（取每个 key 的第一个值）。
+func headerToMap(headers map[string][]string) map[string]any {
+	out := make(map[string]any, len(headers))
+	for k, v := range headers {
+		if len(v) == 0 {
+			out[k] = ""
+		} else {
+			out[k] = v[0]
+		}
+	}
+	return out
+}
+
 // SetParam 添加查询参数
 func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 	h.params.Add(key, fmt.Sprintf("%v", value))
@@ -176,15 +231,12 @@ func (h *HTTPRequest) SetParam(key string, value any) *HTTPRequest {
 }
 
 // SetFormData 添加单个 application/x-www-form-urlencoded 表单参数。
-// 适用于 POST/PUT 请求，内容类型自动设为 application/x-www-form-urlencoded。
-// 多次调用同名 key 会追加值。
 func (h *HTTPRequest) SetFormData(key string, value any) *HTTPRequest {
 	h.formData.Add(key, fmt.Sprintf("%v", value))
 	return h
 }
 
 // SetFormDataMap 批量设置 application/x-www-form-urlencoded 表单参数。
-// 与 resty 的 SetFormData(map[string]string) 行为一致。
 func (h *HTTPRequest) SetFormDataMap(data map[string]string) *HTTPRequest {
 	if len(data) > 0 {
 		for k, v := range data {
@@ -217,14 +269,12 @@ func (h *HTTPRequest) DeleteCtx(ctx context.Context, reqUrl string) *HTTPRespone
 }
 
 // Post 发起 POST 请求（无 Context，使用 Background）。
-// 需提前设置 body（如 GetCtx 不设置 body，Post 系列自动编码 formData）。
 func (h *HTTPRequest) Post(reqUrl string) *HTTPRespone {
 	ctx := context.Background()
 	return h.PostCtx(ctx, reqUrl)
 }
 
 // PostCtx 发起带 Context 的 POST 请求。
-// 需提前通过 SetFormDataMap 或 PostJsonCtx/PostFormCtx 等设置 body。
 func (h *HTTPRequest) PostCtx(ctx context.Context, reqUrl string) *HTTPRespone {
 	h.url = reqUrl
 	h.method = http.MethodPost
@@ -273,12 +323,12 @@ func (h *HTTPRequest) setBody(req *http.Request) {
 	}
 }
 
-// 自动添加referers
+// 自动添加 referer
 func (h *HTTPRequest) setReferer(ctx context.Context, req *http.Request) {
 	if h.header.Get("Referer") != "" {
 		return
 	}
-	appName := GetString("http.service")
+	appName := h.resolveService()
 	value := ""
 	if req.URL != nil {
 		value = `http://` + req.Host + req.URL.RequestURI()
@@ -295,54 +345,54 @@ func (h *HTTPRequest) setTrace(cx context.Context, req *http.Request) context.Co
 	if cx == nil {
 		cx = context.Background()
 	}
-	traceInfo := new(Trace)
-	spanId := SpanIdDefault
+	traceInfo := new(logger.Trace)
+	spanId := logger.SpanIdDefault
 
 	if gCtx, ok := cx.(*gin.Context); ok {
-		if val, exists := gCtx.Get(TraceCtx); exists {
-			if t, ok := val.(*Trace); ok {
+		if val, exists := gCtx.Get(logger.TraceCtx); exists {
+			if t, ok := val.(*logger.Trace); ok {
 				traceInfo = t
 			}
 		}
 		if traceInfo.SpanId == "" {
-			traceInfo.SpanId = SpanIdDefault
+			traceInfo.SpanId = logger.SpanIdDefault
 		}
 		indexArr := strings.Split(traceInfo.SpanId, ".")
 		index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
 		spanId = traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
 
-		newTrace := &Trace{
+		newTrace := &logger.Trace{
 			TraceId: traceInfo.TraceId,
 			SpanId:  spanId,
 			UserId:  traceInfo.UserId,
 			Method:  traceInfo.Method,
 			Path:    req.URL.Host + req.URL.Path,
 			Status:  gCtx.Writer.Status(),
-			Headers: getHeader(h.header),
+			Headers: headerToMap(h.header),
 		}
-		gCtx.Set(TraceCtx, newTrace)
+		gCtx.Set(logger.TraceCtx, newTrace)
 		traceInfo = newTrace
-		cx = context.WithValue(gCtx.Request.Context(), TraceCtx, traceInfo)
+		cx = context.WithValue(gCtx.Request.Context(), logger.TraceCtx, traceInfo)
 	} else {
 		if h.header.Get(SpanId) != "" {
 			traceInfo.SpanId = h.header.Get(SpanId)
 		}
 		if traceInfo.SpanId == "" {
-			traceInfo.SpanId = SpanIdDefault
+			traceInfo.SpanId = logger.SpanIdDefault
 		}
 		indexArr := strings.Split(traceInfo.SpanId, ".")
 		index, _ := strconv.Atoi(indexArr[len(indexArr)-1])
 		spanId = traceInfo.SpanId + "." + strconv.FormatInt(int64(index)+1, 10)
-		traceInfo = &Trace{
+		traceInfo = &logger.Trace{
 			TraceId: strings.ReplaceAll(uuid.NewString(), "-", ""),
 			SpanId:  spanId,
 			UserId:  0,
 			Method:  h.method,
 			Path:    h.url,
 			Status:  200,
-			Headers: getHeader(h.header),
+			Headers: headerToMap(h.header),
 		}
-		cx = context.WithValue(cx, TraceCtx, traceInfo)
+		cx = context.WithValue(cx, logger.TraceCtx, traceInfo)
 	}
 
 	for k, v := range traceInfo.Headers {
@@ -366,7 +416,6 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 		return &HTTPRespone{Error: err}
 	}
 
-	// 注入查询参数
 	if len(h.params) > 0 {
 		q := u.Query()
 		for k, vs := range h.params {
@@ -377,20 +426,18 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 		u.RawQuery = q.Encode()
 	}
 
-	// 如果未显式设置 body 但有 formData，自动编码为 application/x-www-form-urlencoded
 	if len(h.body) == 0 && len(h.formData) > 0 {
 		h.header.Set("Content-Type", FormContentType)
 		h.body = []byte(h.formData.Encode())
 	}
 
-	Infotf(ctx, "request %v: %v", h.method, u.String())
+	logger.Infotf(ctx, "request %v: %v", h.method, u.String())
 
 	req, err := http.NewRequestWithContext(ctx, h.method, u.String(), nil)
 	if err != nil {
 		return &HTTPRespone{Error: err}
 	}
 
-	// 设置 Header
 	req.Header = h.header.Clone()
 
 	h.setBody(req)
@@ -407,17 +454,15 @@ func (h *HTTPRequest) doRequest(ctx context.Context) *HTTPRespone {
 	const maxRetries = 10
 	for i := 0; ; i++ {
 		if i > 0 {
-			Infotf(newCtx, "retry request %v: %v, times: %d", h.method, u.String(), i)
+			logger.Infotf(newCtx, "retry request %v: %v, times: %d", h.method, u.String(), i)
 		}
 		resp, err = h.client.Do(req)
 		if err == nil {
 			break
 		}
-		// 检查 context 是否已取消或超时
 		if newCtx.Err() != nil {
 			return &HTTPRespone{Error: newCtx.Err()}
 		}
-		// 达到重试上限时退出；-1 表示无限重试，但受 maxRetries 硬上限保护
 		if h.retries >= 0 && i >= h.retries {
 			break
 		}
