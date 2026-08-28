@@ -4,17 +4,17 @@
 
 ## 核心能力
 
-| 模块 | 说明 |
-|------|------|
-| 配置 | 基于 [Viper](https://github.com/spf13/viper)，自动发现配置文件，支持 TOML / YAML / JSON |
-| 日志 | 基于 [zap](https://github.com/uber-go/zap)，按天分割，自动关联链路追踪上下文 |
-| MySQL | 基于 [xorm](https://xorm.io/)，连接池、读写分离、事务封装 |
-| Redis | 连接池、字符串/哈希/列表/集合/有序集合操作、分布式锁、令牌桶限流 |
-| HTTP 客户端 | 链式 API，支持超时、重试、链路追踪自动传播 |
-| 参数校验 | 基于 `go-playground/validator`，支持丰富的校验规则 |
-| 定时任务 | 基于 [cron](https://github.com/robfig/cron)，秒级精度，提供便捷的时间表达 |
-| SSE 流 | Server-Sent Events 客户端，支持流式消费 |
-| 其他 | Panic 恢复、健康检查、Pprof 性能分析、跨域中间件 |
+| 模块        | 说明                                                                                                                    |
+|-------------|-------------------------------------------------------------------------------------------------------------------------|
+| 配置        | 基于 [Viper](https://github.com/spf13/viper)，自动发现配置文件，支持 TOML / YAML / JSON；可选 Nacos（HTTP）合并与热更新 |
+| 日志        | 基于 [zap](https://github.com/uber-go/zap)，按天分割，自动关联链路追踪上下文                                            |
+| MySQL       | 基于 [xorm](https://xorm.io/)，连接池、读写分离、事务封装                                                               |
+| Redis       | 连接池、字符串/哈希/列表/集合/有序集合操作、分布式锁、令牌桶限流                                                        |
+| HTTP 客户端 | 链式 API，支持超时、重试、链路追踪自动传播                                                                              |
+| 参数校验    | 基于 `go-playground/validator`，支持丰富的校验规则                                                                      |
+| 定时任务    | 基于 [cron](https://github.com/robfig/cron)，秒级精度，提供便捷的时间表达                                               |
+| SSE 流      | Server-Sent Events 客户端，支持流式消费                                                                                 |
+| 其他        | Panic 恢复、健康检查、Pprof 性能分析、跨域中间件                                                                        |
 
 ## 安装
 
@@ -57,6 +57,34 @@ go run main.go -env=dev
 1. 环境变量 `APP_CONFIG_FILE` 指定的绝对路径
 2. 在 `./`、`./config`、`./configs` 目录中查找 `app.toml` / `app.yaml` / `app.json` 等
 3. 若上述目录恰好只有一个配置文件，自动使用它
+
+### Nacos（可选）
+
+`InitApp` 在加载本地 `app.*` 之后、初始化 MySQL/Redis 之前，读取 `bootstrap.yaml`：
+
+| 行为                  | 说明                                                                |
+|-----------------------|---------------------------------------------------------------------|
+| `nacos.enabled=true`  | 用 **HTTP SDK（v1）** 拉取并合并进运行时配置，并 Listen 热更新      |
+| `nacos.enabled=false` | 若存在 `configs/nacos.{env}.yaml`（或 `nacos.localPath`），自动合并 |
+| `failLocalFallback`   | 远程拉取失败时合并本地兜底文件                                      |
+| `dataIdByEnv`         | Data ID 追加 `-{env}`（如 `my-app-dev`）                            |
+| `mode`                | `http`（默认，v1 SDK / OpenAPI）或 `grpc`（v2 SDK，直连 Nacos 2.x） |
+| `grpcPort`            | gRPC 端口，可选；默认 SDK 使用 `Port+1000`                          |
+
+```yaml
+# configs/bootstrap.yaml
+nacos:
+  enabled: false
+  mode: http
+  serverAddr: "http://nacos-gateway.example/tcm-api"
+  prefix: "my-app"
+  dataId: "my-app"
+  dataIdByEnv: true
+  failLocalFallback: true
+  group: "DEFAULT_GROUP"
+```
+
+业务侧只需 `gohera.InitApp()`，然后使用 `gohera.Mysql` / `gohera.Redis` / `gohera.GetString`；无需自行接入 Nacos。
 
 ```toml
 # config.toml

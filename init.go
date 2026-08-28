@@ -33,6 +33,12 @@ func InitApp() (router *gin.Engine) {
 		panic(fmt.Errorf("init config fail ：  %s \n", err))
 	}
 
+	// Nacos（可选）：合并远程配置后再初始化 MySQL/Redis
+	// bootstrap.yaml：nacos.enabled + mode=http|grpc；未启用时合并 configs/nacos.{env}.yaml
+	if err = initNacosConfig(); err != nil {
+		panic(fmt.Errorf("init nacos config fail ：  %s \n", err))
+	}
+
 	// 初始化日志：从配置桥接到独立 logger 包（可覆盖此前仅控制台的 Init）
 	appPath := GetDefaultString("log.path", DefaultLogPath)
 	filePath := appPath + "/" + appName
