@@ -7,8 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/locales/zh"
-	"github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
 	zhtranslations "github.com/go-playground/validator/v10/translations/zh"
 )
 

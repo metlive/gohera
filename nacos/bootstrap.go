@@ -1,4 +1,4 @@
-package gohera
+package nacos
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-// nacosBootstrap 来自 bootstrap.yaml / 环境变量，描述 Nacos 连接与拉取行为。
+// bootstrapConfig 来自 bootstrap.yaml / 环境变量，描述 Nacos 连接与拉取行为。
 // mode: http（nacos-sdk-go v1，兼容 OpenAPI/网关）| grpc（nacos-sdk-go v2）。
-type nacosBootstrap struct {
+type bootstrapConfig struct {
 	Enabled           bool
 	Mode              string // http（默认）| grpc
 	ServerAddr        string
@@ -34,15 +34,15 @@ type nacosBootstrap struct {
 	GrpcPort          uint64 // grpc 模式可选；0 表示 SDK 默认 Port+1000
 }
 
-func loadNacosBootstrap() (*nacosBootstrap, error) {
+func (s *Source) loadBootstrap() (*bootstrapConfig, error) {
 	v := viper.New()
 	v.SetConfigName("bootstrap")
-	for _, dir := range configSearchPaths {
+	for _, dir := range s.SearchPaths {
 		v.AddConfigPath(dir)
 	}
 	_ = v.ReadInConfig()
 
-	cfg := &nacosBootstrap{
+	cfg := &bootstrapConfig{
 		Enabled:           v.GetBool("nacos.enabled"),
 		Mode:              firstNonEmpty(v.GetString("nacos.mode"), "http"),
 		ServerAddr:        firstNonEmpty(v.GetString("nacos.serverAddr"), v.GetString("nacos.server-addr")),
@@ -68,12 +68,12 @@ func loadNacosBootstrap() (*nacosBootstrap, error) {
 		GrpcPort: firstNonZeroUint64(v.GetUint64("nacos.grpcPort"), v.GetUint64("nacos.grpc-port")),
 	}
 
-	applyNacosEnvOverrides(cfg)
-	applyNacosDefaults(cfg)
+	applyEnvOverrides(cfg)
+	s.applyDefaults(cfg)
 	return cfg, nil
 }
 
-func applyNacosDefaults(cfg *nacosBootstrap) {
+func (s *Source) applyDefaults(cfg *bootstrapConfig) {
 	if cfg.Mode == "" {
 		cfg.Mode = "http"
 	}
@@ -84,11 +84,7 @@ func applyNacosDefaults(cfg *nacosBootstrap) {
 		cfg.DataID = cfg.Prefix
 	}
 	if cfg.DataIDByEnv && cfg.DataID != "" {
-		env := GetEnv()
-		if env == "" {
-			env = DeployEnvDev
-		}
-		suffix := "-" + env
+		suffix := "-" + s.currentEnv()
 		if !strings.HasSuffix(cfg.DataID, suffix) {
 			cfg.DataID = cfg.DataID + suffix
 		}
@@ -107,15 +103,11 @@ func applyNacosDefaults(cfg *nacosBootstrap) {
 	}
 	if cfg.LocalPath == "" {
 		// 约定：configs/nacos.{env}.yaml 作为本地兜底
-		env := GetEnv()
-		if env == "" {
-			env = DeployEnvDev
-		}
-		cfg.LocalPath = fmt.Sprintf("configs/nacos.%s.yaml", env)
+		cfg.LocalPath = fmt.Sprintf("configs/nacos.%s.yaml", s.currentEnv())
 	}
 }
 
-func applyNacosEnvOverrides(cfg *nacosBootstrap) {
+func applyEnvOverrides(cfg *bootstrapConfig) {
 	if val := os.Getenv("NACOS_ENABLED"); val != "" {
 		cfg.Enabled = val == "1" || strings.EqualFold(val, "true")
 	}

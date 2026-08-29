@@ -1,4 +1,4 @@
-package gohera
+package nacos
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// nacosAddr 解析后的 Nacos 服务地址（HTTP / gRPC 共用）。
-type nacosAddr struct {
+// addr 解析后的 Nacos 服务地址（HTTP / gRPC 共用）。
+type addr struct {
 	Scheme      string
 	IpAddr      string
 	Port        uint64
@@ -16,16 +16,16 @@ type nacosAddr struct {
 	GrpcPort    uint64 // 0 表示交由 SDK 按 Port+1000 推导
 }
 
-func parseNacosAddr(serverAddr string, grpcPort uint64) (*nacosAddr, error) {
-	addr := strings.TrimSpace(serverAddr)
-	if addr == "" {
+func parseAddr(serverAddr string, grpcPort uint64) (*addr, error) {
+	raw := strings.TrimSpace(serverAddr)
+	if raw == "" {
 		return nil, fmt.Errorf("nacos.serverAddr is empty")
 	}
-	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		addr = "http://" + addr
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+		raw = "http://" + raw
 	}
 
-	u, err := url.Parse(addr)
+	u, err := url.Parse(raw)
 	if err != nil {
 		return nil, fmt.Errorf("parse nacos.serverAddr %q: %w", serverAddr, err)
 	}
@@ -53,7 +53,7 @@ func parseNacosAddr(serverAddr string, grpcPort uint64) (*nacosAddr, error) {
 		}
 	}
 
-	return &nacosAddr{
+	return &addr{
 		Scheme:      scheme,
 		IpAddr:      u.Hostname(),
 		Port:        portNum,

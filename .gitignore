@@ -2,3 +2,6 @@
 /.idea/gohera.iml
 /.idea/workspace.xml
 /.idea/vcs.xml
+docs/
+.idea/go.imports.xml
+.idea/

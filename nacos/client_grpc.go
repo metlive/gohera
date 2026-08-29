@@ -1,4 +1,4 @@
-package gohera
+package nacos
 
 import (
 	"fmt"
@@ -18,9 +18,9 @@ var (
 	nacosGRPCErr    error
 )
 
-func getNacosGRPCClient(cfg *nacosBootstrap) (config_client.IConfigClient, error) {
+func getGRPCClient(cfg *bootstrapConfig) (config_client.IConfigClient, error) {
 	nacosGRPCOnce.Do(func() {
-		addr, err := parseNacosAddr(cfg.ServerAddr, cfg.GrpcPort)
+		addr, err := parseAddr(cfg.ServerAddr, cfg.GrpcPort)
 		if err != nil {
 			nacosGRPCErr = err
 			return
@@ -58,8 +58,8 @@ func getNacosGRPCClient(cfg *nacosBootstrap) (config_client.IConfigClient, error
 	return nacosGRPCClient, nacosGRPCErr
 }
 
-func fetchNacosConfigGRPC(cfg *nacosBootstrap) (string, error) {
-	client, err := getNacosGRPCClient(cfg)
+func fetchConfigGRPC(cfg *bootstrapConfig) (string, error) {
+	client, err := getGRPCClient(cfg)
 	if err != nil {
 		return "", fmt.Errorf("create nacos grpc client: %w", err)
 	}
@@ -76,8 +76,8 @@ func fetchNacosConfigGRPC(cfg *nacosBootstrap) (string, error) {
 	return content, nil
 }
 
-func startNacosListenGRPC(cfg *nacosBootstrap) error {
-	client, err := getNacosGRPCClient(cfg)
+func startListenGRPC(s *Source, cfg *bootstrapConfig) error {
+	client, err := getGRPCClient(cfg)
 	if err != nil {
 		return fmt.Errorf("create nacos grpc client: %w", err)
 	}
@@ -85,7 +85,7 @@ func startNacosListenGRPC(cfg *nacosBootstrap) error {
 		DataId: cfg.DataID,
 		Group:  cfg.Group,
 		OnChange: func(_, group, dataId, data string) {
-			if err := mergeRemoteIntoApp(data, cfg.ConfigFormat); err != nil {
+			if err := s.merge(data, cfg.ConfigFormat); err != nil {
 				fmt.Fprintf(os.Stderr, "[gohera] nacos grpc hot reload failed dataId=%s group=%s: %v\n", dataId, group, err)
 				return
 			}

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metlive/gohera/logger"
 	"github.com/metlive/gohera/mysql"
+	"github.com/metlive/gohera/nacos"
 	"github.com/metlive/gohera/okhttp"
 	"github.com/metlive/gohera/redis"
 )
@@ -35,7 +36,18 @@ func InitApp() (router *gin.Engine) {
 
 	// Nacos（可选）：合并远程配置后再初始化 MySQL/Redis
 	// bootstrap.yaml：nacos.enabled + mode=http|grpc；未启用时合并 configs/nacos.{env}.yaml
-	if err = initNacosConfig(); err != nil {
+	nacosSource := &nacos.Source{
+		DefaultEnv:  DeployEnvDev,
+		Env:         GetEnv,
+		SearchPaths: configSearchPaths,
+		Merge: func(settings map[string]any) error {
+			if err := config.MergeConfigMap(settings); err != nil {
+				return fmt.Errorf("merge remote config: %w", err)
+			}
+			return refreshCache()
+		},
+	}
+	if err = nacosSource.Init(); err != nil {
 		panic(fmt.Errorf("init nacos config fail ：  %s \n", err))
 	}
 

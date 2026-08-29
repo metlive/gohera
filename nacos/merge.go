@@ -1,4 +1,4 @@
-package gohera
+package nacos
 
 import (
 	"fmt"
@@ -11,9 +11,8 @@ import (
 
 var nacosMergeMu sync.Mutex
 
-// mergeRemoteIntoApp 将远程/兜底配置合并进运行时 viper（顶层 key 覆盖），并刷新缓存。
-// 保留原 config 实例，以免丢失 WatchConfig。
-func mergeRemoteIntoApp(remoteContent, format string) error {
+// merge 将远程/兜底配置解析后经 Merge 回调写回应用配置（顶层 key 覆盖）并刷新缓存。
+func (s *Source) merge(remoteContent, format string) error {
 	remote, err := parseConfigContent(remoteContent, format)
 	if err != nil {
 		return err
@@ -22,13 +21,10 @@ func mergeRemoteIntoApp(remoteContent, format string) error {
 	nacosMergeMu.Lock()
 	defer nacosMergeMu.Unlock()
 
-	if err := config.MergeConfigMap(remote.AllSettings()); err != nil {
-		return fmt.Errorf("merge remote config: %w", err)
-	}
-	return refreshCache()
+	return s.Merge(remote.AllSettings())
 }
 
-func mergeLocalFallbackFile(path, format string) error {
+func (s *Source) mergeLocalFallback(path, format string) error {
 	if !localFileExists(path) {
 		return fmt.Errorf("local fallback config not found: %s", path)
 	}
@@ -36,7 +32,7 @@ func mergeLocalFallbackFile(path, format string) error {
 	if err != nil {
 		return fmt.Errorf("read local fallback %s: %w", path, err)
 	}
-	return mergeRemoteIntoApp(string(data), format)
+	return s.merge(string(data), format)
 }
 
 func parseConfigContent(content, format string) (*viper.Viper, error) {

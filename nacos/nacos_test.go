@@ -1,12 +1,12 @@
-package gohera
+package nacos
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestParseNacosAddr(t *testing.T) {
-	addr, err := parseNacosAddr("http://cloud-test.tal.com/tcm-api", 0)
+func TestParseAddr(t *testing.T) {
+	addr, err := parseAddr("http://cloud-test.tal.com/tcm-api", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -17,7 +17,7 @@ func TestParseNacosAddr(t *testing.T) {
 		t.Fatalf("contextPath=%q", addr.ContextPath)
 	}
 
-	addr2, err := parseNacosAddr("127.0.0.1:8848", 9848)
+	addr2, err := parseAddr("127.0.0.1:8848", 9848)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,13 +40,13 @@ func TestNormalizeConfigType(t *testing.T) {
 	}
 }
 
-func TestApplyNacosDefaults_DataIDByEnv(t *testing.T) {
-	appEnv = DeployEnvDev
-	cfg := &nacosBootstrap{
+func TestApplyDefaults_DataIDByEnv(t *testing.T) {
+	s := &Source{Env: func() string { return "dev" }}
+	cfg := &bootstrapConfig{
 		DataID:      "my-app",
 		DataIDByEnv: true,
 	}
-	applyNacosDefaults(cfg)
+	s.applyDefaults(cfg)
 	if cfg.DataID != "my-app-dev" {
 		t.Fatalf("dataId=%q", cfg.DataID)
 	}
