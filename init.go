@@ -22,8 +22,8 @@ const DefaultLogPath = "/var/log/trace"
 func InitApp() (router *gin.Engine) {
 	flag.Parse()
 
-	// 解析环境变量
-	err := parseEnv(*env)
+	// 解析部署环境：显式 -env > APP_ENV > 默认 dev
+	err := parseEnv(resolveDeployEnv(*env))
 	if err != nil {
 		panic(fmt.Errorf("env parse fail ：  %s \n", err))
 	}
@@ -41,10 +41,8 @@ func InitApp() (router *gin.Engine) {
 		Env:         GetEnv,
 		SearchPaths: configSearchPaths,
 		Merge: func(settings map[string]any) error {
-			if err := config.MergeConfigMap(settings); err != nil {
-				return fmt.Errorf("merge remote config: %w", err)
-			}
-			return refreshCache()
+			store.applyOverlay(settings)
+			return nil
 		},
 	}
 	if err = nacosSource.Init(); err != nil {

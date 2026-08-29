@@ -1,8 +1,10 @@
 package gohera
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,11 +26,13 @@ var (
 	appPodIp     string
 )
 
-// parseEnv 解析环境变量
+// parseEnv 解析运行环境与进程元信息。
+// 部署级别由 resolveDeployEnv 决定：显式 -env > APP_ENV > 默认 dev。
 func parseEnv(env string) error {
 	if env == "" {
 		env = DeployEnvDev
 	}
+	env = strings.ToLower(strings.TrimSpace(env))
 
 	switch env {
 	case DeployEnvDev, DeployEnvTest, DeployEnvPre, DeployEnvProd:
@@ -46,6 +50,37 @@ func parseEnv(env string) error {
 
 	updateGinMode()
 	return nil
+}
+
+// resolveDeployEnv 框架级部署环境：
+//  1. 命令行显式传入 -env（本地调试）
+//  2. 环境变量 APP_ENV（容器 / K8s 注入）
+//  3. 默认 dev
+func resolveDeployEnv(flagVal string) string {
+	return pickDeployEnv(flagVal, envFlagExplicit(), os.Getenv("APP_ENV"))
+}
+
+func pickDeployEnv(flagVal string, flagSet bool, appEnvVar string) string {
+	if flagSet && strings.TrimSpace(flagVal) != "" {
+		return flagVal
+	}
+	if v := strings.TrimSpace(appEnvVar); v != "" {
+		return v
+	}
+	if strings.TrimSpace(flagVal) != "" {
+		return flagVal
+	}
+	return DeployEnvDev
+}
+
+func envFlagExplicit() bool {
+	explicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "env" {
+			explicit = true
+		}
+	})
+	return explicit
 }
 
 // updateGinMode 根据当前环境更新 Gin 的模式
@@ -85,12 +120,12 @@ func IsProd() bool {
 	return appEnv == DeployEnvProd
 }
 
-// GetAppMode 获取应用运行模式 (OCEAN_MODE)
+// GetAppMode 获取应用运行模式（APP_MODE）
 func GetAppMode() string {
 	return appMode
 }
 
-// GetAppName 获取应用名称 (OCEAN_APP)
+// GetAppName 获取应用名称（APP_NAME）
 func GetAppName() string {
 	return appName
 }
@@ -100,7 +135,7 @@ func GetAppNamespace() string {
 	return appNamespace
 }
 
-// GetAppVersion 获取应用版本 (OCEAN_VERSION)
+// GetAppVersion 获取应用版本（APP_VERSION）
 func GetAppVersion() string {
 	return appVersion
 }

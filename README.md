@@ -6,7 +6,7 @@
 
 | 模块        | 说明                                                                                                                    |
 |-------------|-------------------------------------------------------------------------------------------------------------------------|
-| 配置        | 基于 [Viper](https://github.com/spf13/viper)，自动发现配置文件，支持 TOML / YAML / JSON；可选 Nacos（HTTP）合并与热更新 |
+| 配置        | 基于 [Koanf](https://github.com/knadh/koanf)，自动发现配置文件，支持 TOML / YAML / JSON；可选 Nacos（HTTP/gRPC）合并与热更新 |
 | 日志        | 基于 [zap](https://github.com/uber-go/zap)，按天分割，自动关联链路追踪上下文                                            |
 | MySQL       | 基于 [xorm](https://xorm.io/)，连接池、读写分离、事务封装                                                               |
 | Redis       | 连接池、字符串/哈希/列表/集合/有序集合操作、分布式锁、令牌桶限流                                                        |
@@ -47,8 +47,11 @@ func main() {
 ```
 
 ```bash
-# 在项目根目录放好配置文件，指定环境启动
+# 本地：命令行指定部署环境
 go run main.go -env=dev
+
+# 容器 / K8s：由框架读取 APP_ENV（未传 -env 时生效）
+# export APP_ENV=prod
 ```
 
 ## 配置
@@ -64,7 +67,7 @@ go run main.go -env=dev
 
 | 行为                  | 说明                                                                |
 |-----------------------|---------------------------------------------------------------------|
-| `nacos.enabled=true`  | 用 **HTTP SDK（v1）** 拉取并合并进运行时配置，并 Listen 热更新      |
+| `nacos.enabled=true`  | 按 `mode`（http/grpc）拉取并合并进运行时配置，并 Listen 热更新      |
 | `nacos.enabled=false` | 若存在 `configs/nacos.{env}.yaml`（或 `nacos.localPath`），自动合并 |
 | `failLocalFallback`   | 远程拉取失败时合并本地兜底文件                                      |
 | `dataIdByEnv`         | Data ID 追加 `-{env}`（如 `my-app-dev`）                            |
@@ -92,6 +95,8 @@ nacos:
 [http]
 host = "0.0.0.0"
 port = 8080
+
+[zhttp]
 pprof = 1              # 开启 pprof，访问 /debug/pprof
 
 [log]
@@ -123,7 +128,7 @@ port := gohera.GetInt("http.port")
 timeout := gohera.GetDuration("timeout")
 
 // 更多类型
-gohera.GetBool("http.pprof")
+gohera.GetBool("zhttp.pprof")
 gohera.GetFloat64("threshold")
 gohera.GetStringSlice("allow_origins")
 gohera.GetStringMap("mysql") // 获取所有 mysql 配置节点
@@ -133,10 +138,17 @@ if gohera.IsSet("redis") { ... }
 
 // 将配置反序列化到结构体
 type MyConfig struct {
-    Key string `toml:"key"`
+    Key string `mapstructure:"key"`
 }
 var cfg MyConfig
 gohera.UnmarshalKey("myconfig", &cfg)
+
+// 整份配置反序列化 + 热更新回调
+var all AppConfig
+gohera.Unmarshal(&all)
+gohera.OnConfigChange(func() {
+    gohera.Unmarshal(&all) // 配置变更后自行刷新本地副本
+})
 ```
 
 ## 日志
@@ -514,12 +526,20 @@ err := gohera.StreamSSE(&gohera.StreamConfig{
 
 ## 环境
 
+部署级别由 **gohera 框架**解析，优先级：
+
+1. 命令行显式 `-env`（本地调试）
+2. 环境变量 `APP_ENV`（容器 / K8s 注入，框架直读，不进配置快照）
+3. 默认 `dev`
+
 | 环境 | 说明 | Gin Mode |
 |------|------|----------|
 | `dev` | 开发环境 | Debug |
 | `test` | 测试环境 | Test |
 | `pre` | 预发布环境 | Release |
 | `prod` | 生产环境 | Release |
+
+未传 `-env` 且未设 `APP_ENV` 时按 `dev` 启动；生产必须注入 `APP_ENV=prod` 或启动参数 `-env=prod`，否则会以 Debug 模式跑。
 
 代码中判断环境：
 
@@ -571,7 +591,10 @@ if !gohera.IsDev() {
 
 ```
 敏感信息建议通过环境变量覆盖配置文件中
-的明文值，框架自动映射 APP_ 前缀的环境变量：
+的明文值，框架自动映射 APP_ 前缀的环境变量
+（下划线对应配置层级，如 `APP_HTTP_PORT` → `http.port`）。
+环境变量同时作用于 `Get*` 读取与 `Unmarshal*` 反序列化，
+且只覆盖文件中已存在的叶子键：
 
   export APP_MYSQL_DEFAULT_PASSWORD=secret
   # 覆盖配置文件中 [mysql.default] 下的 password 字段

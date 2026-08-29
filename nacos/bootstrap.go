@@ -7,7 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/metlive/gohera/internal/configutil"
+	"github.com/spf13/cast"
 )
 
 // bootstrapConfig 来自 bootstrap.yaml / 环境变量，描述 Nacos 连接与拉取行为。
@@ -35,42 +36,76 @@ type bootstrapConfig struct {
 }
 
 func (s *Source) loadBootstrap() (*bootstrapConfig, error) {
-	v := viper.New()
-	v.SetConfigName("bootstrap")
-	for _, dir := range s.SearchPaths {
-		v.AddConfigPath(dir)
+	m, err := loadBootstrapFile(s.SearchPaths)
+	if err != nil {
+		return nil, err
 	}
-	_ = v.ReadInConfig()
+
+	str := func(key string) string {
+		v, _ := configutil.Lookup(m, key)
+		out, _ := cast.ToStringE(v)
+		return out
+	}
+	boolean := func(key string) bool {
+		v, _ := configutil.Lookup(m, key)
+		out, _ := cast.ToBoolE(v)
+		return out
+	}
+	u64 := func(key string) uint64 {
+		v, _ := configutil.Lookup(m, key)
+		out, _ := cast.ToUint64E(v)
+		return out
+	}
 
 	cfg := &bootstrapConfig{
-		Enabled:           v.GetBool("nacos.enabled"),
-		Mode:              firstNonEmpty(v.GetString("nacos.mode"), "http"),
-		ServerAddr:        firstNonEmpty(v.GetString("nacos.serverAddr"), v.GetString("nacos.server-addr")),
-		Namespace:         v.GetString("nacos.namespace"),
-		AccessKey:         firstNonEmpty(v.GetString("nacos.accessKey"), v.GetString("nacos.access-key")),
-		SecretKey:         firstNonEmpty(v.GetString("nacos.secretKey"), v.GetString("nacos.secret-key")),
-		Username:          v.GetString("nacos.username"),
-		Password:          v.GetString("nacos.password"),
-		Prefix:            v.GetString("nacos.prefix"),
-		ConfigFormat:      firstNonEmpty(v.GetString("nacos.configFormat"), v.GetString("nacos.config-format")),
-		FailLocalFallback: v.GetBool("nacos.failLocalFallback"),
-		DataIDByEnv:       v.GetBool("nacos.dataIdByEnv"),
-		TimeoutMs:         v.GetUint64("nacos.timeoutMs"),
-		DataID:            firstNonEmpty(v.GetString("nacos.dataId"), v.GetString("nacos.data-id")),
-		Group:             v.GetString("nacos.group"),
+		Enabled:           boolean("nacos.enabled"),
+		Mode:              firstNonEmpty(str("nacos.mode"), "http"),
+		ServerAddr:        firstNonEmpty(str("nacos.serveraddr"), str("nacos.server-addr")),
+		Namespace:         str("nacos.namespace"),
+		AccessKey:         firstNonEmpty(str("nacos.accesskey"), str("nacos.access-key")),
+		SecretKey:         firstNonEmpty(str("nacos.secretkey"), str("nacos.secret-key")),
+		Username:          str("nacos.username"),
+		Password:          str("nacos.password"),
+		Prefix:            str("nacos.prefix"),
+		ConfigFormat:      firstNonEmpty(str("nacos.configformat"), str("nacos.config-format")),
+		FailLocalFallback: boolean("nacos.faillocalfallback"),
+		DataIDByEnv:       boolean("nacos.dataidbyenv"),
+		TimeoutMs:         u64("nacos.timeoutms"),
+		DataID:            firstNonEmpty(str("nacos.dataid"), str("nacos.data-id")),
+		Group:             str("nacos.group"),
 		LocalPath: firstNonEmpty(
-			v.GetString("nacos.localPath"),
-			v.GetString("nacos.local-path"),
-			v.GetString("nacos.localFallbackPath"),
+			str("nacos.localpath"),
+			str("nacos.local-path"),
+			str("nacos.localfallbackpath"),
 		),
-		CacheDir: firstNonEmpty(v.GetString("nacos.cacheDir"), v.GetString("nacos.cache-dir")),
-		LogDir:   firstNonEmpty(v.GetString("nacos.logDir"), v.GetString("nacos.log-dir")),
-		GrpcPort: firstNonZeroUint64(v.GetUint64("nacos.grpcPort"), v.GetUint64("nacos.grpc-port")),
+		CacheDir: firstNonEmpty(str("nacos.cachedir"), str("nacos.cache-dir")),
+		LogDir:   firstNonEmpty(str("nacos.logdir"), str("nacos.log-dir")),
+		GrpcPort: firstNonZeroUint64(u64("nacos.grpcport"), u64("nacos.grpc-port")),
 	}
 
 	applyEnvOverrides(cfg)
 	s.applyDefaults(cfg)
 	return cfg, nil
+}
+
+// loadBootstrapFile 在 SearchPaths 中查找 bootstrap.yaml/yml/json/toml，
+// 找到则加载（key 已 lowercase），找不到返回 nil（与现网 _ = ReadInConfig 一致）。
+func loadBootstrapFile(searchPaths []string) (map[string]any, error) {
+	exts := []string{".yaml", ".yml", ".json", ".toml"}
+	for _, dir := range searchPaths {
+		for _, ext := range exts {
+			path := filepath.Join(dir, "bootstrap"+ext)
+			if !localFileExists(path) {
+				continue
+			}
+			m, err := configutil.LoadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("load bootstrap %s: %w", path, err)
+			}
+			return m, nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *Source) applyDefaults(cfg *bootstrapConfig) {

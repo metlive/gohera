@@ -12,7 +12,7 @@ type Source struct {
 	DefaultEnv  string                     // 当前环境兜底值（根传 gohera.DeployEnvDev）
 	Env         func() string              // 当前运行环境（根传 GetEnv）
 	SearchPaths []string                   // bootstrap.yaml 搜索目录（根传 configSearchPaths）
-	Merge       func(map[string]any) error // 将远程/兜底配置写回根 viper 并刷新缓存
+	Merge       func(map[string]any) error // 将远程/兜底配置写回根 store 并刷新缓存
 }
 
 // Init 在 InitApp 中、MySQL/Redis 初始化之前调用：
