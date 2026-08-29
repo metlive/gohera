@@ -19,16 +19,16 @@ type Client struct {
 }
 
 type Config struct {
-	Address  string
-	Auth     string
-	Database int64
+	Address  string `mapstructure:"address"`
+	Auth     string `mapstructure:"auth"`
+	Database int64  `mapstructure:"database"`
 
-	MaxIdle        int
-	MaxActive      int
-	IdleTimeout    time.Duration
-	ConnectTimeout time.Duration
-	ReadTimeout    time.Duration
-	WriteTimeout   time.Duration
+	MaxIdle        int           `mapstructure:"max_idle"`
+	MaxActive      int           `mapstructure:"max_active"`
+	IdleTimeout    time.Duration `mapstructure:"idle_timeout"`
+	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
+	ReadTimeout    time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout   time.Duration `mapstructure:"write_timeout"`
 }
 
 // New 创建一个新的 Redis 客户端

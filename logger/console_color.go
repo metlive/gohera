@@ -3,6 +3,7 @@ package logger
 import (
 	"os"
 
+	"github.com/mattn/go-isatty"
 	"go.uber.org/zap/zapcore"
 )
 

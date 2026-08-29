@@ -20,17 +20,17 @@ const (
 
 // Config MySQL 连接配置（三方可直接构造，不依赖 gohera）。
 type Config struct {
-	MaxLifeTime  time.Duration `toml:"max_life_time"`  // 连接可被重用的最长时间
-	MaxOpenConns int           `toml:"max_open_conns"` // 最大打开连接数
-	MaxIdleConns int           `toml:"max_idle_conns"` // 空闲池最大连接数
-	User         string        `toml:"user"`
-	Password     string        `toml:"password"`
-	Host         string        `toml:"host"`
-	Port         int           `toml:"port"`
-	Database     string        `toml:"database"`
+	MaxLifeTime  time.Duration `mapstructure:"max_life_time"`  // 连接可被重用的最长时间
+	MaxOpenConns int           `mapstructure:"max_open_conns"` // 最大打开连接数
+	MaxIdleConns int           `mapstructure:"max_idle_conns"` // 空闲池最大连接数
+	User         string        `mapstructure:"user"`
+	Password     string        `mapstructure:"password"`
+	Host         string        `mapstructure:"host"`
+	Port         int           `mapstructure:"port"`
+	Database     string        `mapstructure:"database"`
 	Env          string        // DEV/TEST 时默认开 ShowSQL（可被 ShowSQL 覆盖）
 	ShowSQL      *bool         // 显式控制 SQL 日志；nil 时回退 Env
-	Charset      string        `toml:"charset"` // 默认 utf8
+	Charset      string        `mapstructure:"charset"` // 默认 utf8
 }
 
 // ConnectPool 兼容旧 API，内部仅持有配置。

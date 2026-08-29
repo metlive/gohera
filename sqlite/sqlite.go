@@ -18,10 +18,10 @@ const (
 
 // Config SQLite 配置（三方可直接构造，不依赖 gohera）。
 type Config struct {
-	FilePath     string `toml:"file_path"`
-	MaxOpenConns int    `toml:"max_open_conns"`
-	MaxIdleConns int    `toml:"max_idle_conns"`
-	ShowSQL      bool   `toml:"show_sql"`
+	FilePath     string `mapstructure:"file_path"`
+	MaxOpenConns int    `mapstructure:"max_open_conns"`
+	MaxIdleConns int    `mapstructure:"max_idle_conns"`
+	ShowSQL      bool   `mapstructure:"show_sql"`
 }
 
 // DB 数据库连接，嵌入 xorm.Engine。
