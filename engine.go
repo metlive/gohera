@@ -1,6 +1,8 @@
 package gohera
 
 import (
+	"strings"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -77,12 +79,20 @@ func InitEngine(opts ...EngineOption) *gin.Engine {
 		engine.Use(HandlerRecovery(true))
 	}
 
+	// 基础路由组（配置 http.context_path 时挂前缀）：框架路由（healthz/pprof）
+	// 与业务路由（gohera.Router()）共用，业务侧无需感知前缀
+	baseRouterGroup = ContextPathGroup(engine)
+
 	// 注册默认路由 (healthz, 404, 405)
 	registerRouter(engine)
 
-	// pprof 性能分析（通过配置开关控制）
+	// pprof 性能分析（通过配置开关控制，与业务路由一致挂在 http.context_path 前缀下）
 	if GetInt("zhttp.pprof") == 1 {
-		pprof.Register(engine)
+		if prefix := normalizeContextPath(GetString("http.context_path")); prefix != "" {
+			pprof.Register(engine, strings.TrimPrefix(prefix, "/")+"/debug/pprof")
+		} else {
+			pprof.Register(engine)
+		}
 	}
 
 	// 数字不要解析成 float64

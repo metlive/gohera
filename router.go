@@ -7,8 +7,9 @@ import (
 )
 
 // registerRouter 注册默认路由 (Healthz, 404, 405)
+// /healthz 与业务路由一致挂在 http.context_path 前缀组下（配置后根路径不再提供）
 func registerRouter(engine *gin.Engine) {
-	engine.GET("/healthz", healthCheck)
+	ContextPathGroup(engine).GET("/healthz", healthCheck)
 	//找不路由报错
 	engine.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, newHttpResponse(http.StatusNotFound, "找不到你要的内容,URL:"+c.Request.Host+c.Request.RequestURI, ""))

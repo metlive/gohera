@@ -504,22 +504,26 @@ g.Use(AdminAuth())
 
 ### 接口前缀（context path）
 
-配置 `http.context_path` 后，服务可同时通过前缀路径访问（网关场景常用）。 前缀剥离发生在 Gin 路由之前，因此须包在 `http.Server` 的 Handler 外层，而非 `engine.Use`：
+配置 `http.context_path` 后，所有接口（含框架的 `/healthz`、pprof）统一挂在前缀路由组下， 根路径不再注册对应路由。基础路由组由 `InitApp` / `InitEngine` 自动创建，业务路由经
+`gohera.Router()` 注册即自动获得前缀，业务代码无需感知：
 
 ```go
-srv := &http.Server{Addr: addr, Handler: gohera.ContextPathHandler(engine)}
+engine := gohera.InitApp()
+
+gohera.Router().GET("/health", ...)   // → /my-service/health
+v1 := gohera.Router().Group("/api/v1") // → /my-service/api/v1/*
 ```
 
 ```yaml
 # app.yaml
 http:
-  context_path: "my-service"   # /my-service/api/v1/* → /api/v1/*
+  context_path: "my-service"   # 接口前缀；留空则全部注册在根路径
 ```
 
-- 命中前缀的请求剥去前缀后路由，业务路由按根路径注册，无需感知前缀
-- 根路径始终可用（本地直连、探针、本地代理不受影响）
-- 未配置或留空（`/`）时等价于不包裹
-- 前缀逐请求读取配置，本地文件变更或远程 Nacos 热更新即时生效，无需重启
+- `gohera.Router()` 须在 `InitApp` / `InitEngine` 之后调用，否则 panic
+- 未配置或留空（`/`）时 `Router()` 为根组，行为与直接在 engine 上注册一致
+- 需要显式控制时可用 `gohera.ContextPathGroup(engine)` 获取等价路由组
+- 前缀在进程启动时的路由注册阶段决定，修改配置需重启生效
 
 ## 定时任务
 

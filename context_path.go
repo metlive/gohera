@@ -1,33 +1,44 @@
 package gohera
 
 import (
-	"net/http"
-	"net/url"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-// ContextPathHandler 为 handler 增加可配置接口前缀（config key: http.context_path）。
+// ContextPathGroup 返回挂在 http.context_path 前缀下的基础路由组：
+// 配置了前缀（如 message-dispatcher）时为 engine.Group("/message-dispatcher")，
+// 未配置或留空（"/"）时为根组，行为与直接在 engine 上注册一致。
 //
-// Gin 的路由匹配先于中间件执行，因此前缀剥离必须在引擎外层完成，
-// 用在 http.Server 的 Handler 上，而非 engine.Use：
+// 业务路由统一注册在该组下即自动获得接口前缀（如 /message-dispatcher/api/v1/*），
+// 根路径不再注册对应路由。前缀在进程启动时的路由注册阶段决定，修改配置需重启。
 //
-//	srv := &http.Server{Addr: addr, Handler: gohera.ContextPathHandler(engine)}
+// 常规用法无需自行调用：InitEngine 已设置框架基础路由组，业务路由经 gohera.Router() 注册。
+func ContextPathGroup(engine *gin.Engine) *gin.RouterGroup {
+	prefix := normalizeContextPath(GetString("http.context_path"))
+	if prefix == "" {
+		return engine.Group("/")
+	}
+	return engine.Group(prefix)
+}
+
+// baseRouterGroup 由 InitEngine 设置的基础路由组，Router() 返回它。
+var baseRouterGroup *gin.RouterGroup
+
+// Router 返回框架基础路由组（配置 http.context_path 时挂前缀，未配置时为根组）。
+// 框架自身路由（healthz、pprof）与业务路由共用该组，业务侧在其下注册即自动
+// 获得接口前缀，无需感知配置：
 //
-// 行为：
-//   - 命中前缀的请求剥去前缀后再交给 handler（如 /myapp/api/v1/* → /api/v1/*），
-//     业务路由按根路径注册即可，无需感知前缀
-//   - 未命中的请求原样放行，根路径（本地直连、探针、本地代理）始终可用
-//   - 未配置或配置为空 / "/" 时等价于直接使用原 handler
+//	engine := gohera.InitApp()
+//	gohera.Router().GET("/health", ...)
+//	v1 := gohera.Router().Group("/api/v1")
 //
-// 前缀逐请求读取配置快照：本地文件变更或远程配置热更新即时生效，无需重启。
-func ContextPathHandler(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		prefix := normalizeContextPath(GetString("http.context_path"))
-		if prefix != "" && matchContextPath(r.URL, prefix) {
-			r = withStrippedPrefix(r, prefix)
-		}
-		h.ServeHTTP(w, r)
-	})
+// 须在 InitApp / InitEngine 之后调用，否则 panic。
+func Router() *gin.RouterGroup {
+	if baseRouterGroup == nil {
+		panic("gohera.Router() called before InitApp()/InitEngine()")
+	}
+	return baseRouterGroup
 }
 
 // normalizeContextPath 归一化为以 / 开头、不以 / 结尾；空值与 "/" 视为无前缀。
@@ -37,23 +48,4 @@ func normalizeContextPath(raw string) string {
 		return ""
 	}
 	return "/" + p
-}
-
-// matchContextPath 判断请求路径是否落在前缀之下（前缀本身或其子路径）。
-func matchContextPath(u *url.URL, prefix string) bool {
-	return u.Path == prefix || strings.HasPrefix(u.Path, prefix+"/")
-}
-
-// withStrippedPrefix 浅拷贝请求与 URL 后剥去前缀，不改动下游可见的原请求对象。
-func withStrippedPrefix(r *http.Request, prefix string) *http.Request {
-	r2 := new(http.Request)
-	*r2 = *r
-	r2.URL = new(url.URL)
-	*r2.URL = *r.URL
-	r2.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
-	if r2.URL.Path == "" {
-		r2.URL.Path = "/"
-	}
-	r2.URL.RawPath = strings.TrimPrefix(r.URL.RawPath, prefix)
-	return r2
 }
