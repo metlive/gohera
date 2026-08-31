@@ -35,8 +35,8 @@ func InitApp() (router *gin.Engine) {
 	}
 
 	// Nacos（可选）：合并远程配置后再初始化 MySQL/Redis
-	// bootstrap.yaml（公共基础）+ bootstrap-{env}.yaml（环境覆盖，深合并）；未启用时合并 configs/nacos.{env}.yaml
-	// 引导文件的非 nacos 段作为环境级本地配置合入 base（低于远程/兜底 overlay）
+	// bootstrap.yaml（公共基础）+ bootstrap-{env}.yaml（环境覆盖，深合并）
+	// 引导文件的非 nacos 段作为环境级本地配置合入 base（低于远程 overlay）
 	nacosSource := &nacos.Source{
 		DefaultEnv:  DeployEnvDev,
 		Env:         GetEnv,

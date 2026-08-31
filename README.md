@@ -71,13 +71,15 @@ go run main.go -env=dev
 |------------------------|---------------------------------------------------------------------------------------|
 | `bootstrap-{env}.yaml` | 环境覆盖文件（如 `bootstrap-prod.yaml`），深合并覆盖 `bootstrap.yaml`，只写差异项即可 |
 | `nacos.enabled=true`   | 按 `mode`（http/grpc）拉取并合并进运行时配置，并 Listen 热更新                        |
-| `nacos.enabled=false`  | 若存在 `configs/nacos.{env}.yaml`（或 `nacos.localPath`），自动合并                   |
-| `failLocalFallback`    | 远程拉取失败时合并本地兜底文件                                                        |
+| `nacos.enabled=false`  | 仅用本地值（引导文件非 nacos 段）；显式 `nacos.localPath` 存在时合并                  |
+| `failLocalFallback`    | 远程拉取失败时回落本地值（引导文件非 nacos 段）；显式 `nacos.localPath` 存在时合并    |
 | `dataIdByEnv`          | Data ID 追加 `-{env}`（如 `my-app-dev`）                                              |
 | `mode`                 | `http`（默认，v1 SDK / OpenAPI）或 `grpc`（v2 SDK，直连 Nacos 2.x）                   |
 | `grpcPort`             | gRPC 端口，可选；默认 SDK 使用 `Port+1000`                                            |
 
-配置值优先级：`APP_*` 环境变量 > 远程 Nacos / 本地兜底文件（`configs/nacos.{env}.yaml`）> `bootstrap-{env}.yaml` 非 nacos 段（环境级本地配置）> `app.yaml`。 Nacos 连接参数（`nacos:` 段）：`NACOS_*` 环境变量 > `bootstrap-{env}.yaml` > `bootstrap.yaml`。
+配置值优先级：`APP_*` 环境变量 > 远程 Nacos（或显式 `nacos.localPath` 兜底文件）> `bootstrap-{env}.yaml` 非 nacos 段（环境级本地配置）> `app.yaml`。 Nacos 连接参数（`nacos:` 段）：`NACOS_*` 环境变量 > `bootstrap-{env}.yaml` > `bootstrap.yaml`。
+
+旧版 `configs/nacos.{env}.yaml` 兜底文件约定已废弃：本地值直接写在 `bootstrap-{env}.yaml` 非 nacos 段（随 MergeBase 合入，低于远程配置）。
 
 引导文件除 `nacos:` 段外还可携带环境级本地配置（`mysql` / `redis` / `auth` 等）： 非 nacos 段会合入 base 层（覆盖 `app.yaml` 同名键，低于远程 Nacos / 兜底文件）， 因此每个环境一个文件即可同时声明 Nacos 连接与本地默认值。
 
@@ -499,6 +501,25 @@ g.Use(AdminAuth())
     g.GET("/dashboard", AdminDashboard)
 }
 ```
+
+### 接口前缀（context path）
+
+配置 `http.context_path` 后，服务可同时通过前缀路径访问（网关场景常用）。 前缀剥离发生在 Gin 路由之前，因此须包在 `http.Server` 的 Handler 外层，而非 `engine.Use`：
+
+```go
+srv := &http.Server{Addr: addr, Handler: gohera.ContextPathHandler(engine)}
+```
+
+```yaml
+# app.yaml
+http:
+  context_path: "my-service"   # /my-service/api/v1/* → /api/v1/*
+```
+
+- 命中前缀的请求剥去前缀后路由，业务路由按根路径注册，无需感知前缀
+- 根路径始终可用（本地直连、探针、本地代理不受影响）
+- 未配置或留空（`/`）时等价于不包裹
+- 前缀逐请求读取配置，本地文件变更或远程 Nacos 热更新即时生效，无需重启
 
 ## 定时任务
 

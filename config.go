@@ -148,8 +148,8 @@ func isConfigFile(name string) bool {
 }
 
 // isAppConfigFile 判断是否为 app 配置候选：排除 gohera 专用文件
-// （bootstrap / bootstrap-{env} / nacos.{env}），避免其被当作 app 配置加载
-// 或触发 "multiple config files" 误报。
+// （bootstrap / bootstrap-{env}，以及旧版 nacos.{env} 兜底文件），避免其被当作
+// app 配置加载或触发 "multiple config files" 误报。
 func isAppConfigFile(name string) bool {
 	if !isConfigFile(name) {
 		return false

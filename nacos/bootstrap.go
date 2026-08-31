@@ -174,10 +174,8 @@ func (s *Source) applyDefaults(cfg *bootstrapConfig) {
 	if cfg.LogDir == "" {
 		cfg.LogDir = "./.nacos/log"
 	}
-	if cfg.LocalPath == "" {
-		// 约定：configs/nacos.{env}.yaml 作为本地兜底
-		cfg.LocalPath = fmt.Sprintf("configs/nacos.%s.yaml", s.currentEnv())
-	}
+	// localPath 无默认值：本地值由引导文件（bootstrap*.yaml）非 nacos 段提供（MergeBase），
+	// 仅显式配置 nacos.localPath / NACOS_LOCAL_PATH 时作为额外兜底文件合并
 }
 
 func applyEnvOverrides(cfg *bootstrapConfig) {

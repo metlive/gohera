@@ -3,7 +3,6 @@ package nacos
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/metlive/gohera/internal/configutil"
@@ -70,8 +69,9 @@ func TestApplyDefaults_DataIDByEnv(t *testing.T) {
 	if cfg.Mode != "http" {
 		t.Fatalf("mode=%q", cfg.Mode)
 	}
-	if !strings.Contains(cfg.LocalPath, "nacos.dev.yaml") {
-		t.Fatalf("localPath=%q", cfg.LocalPath)
+	// localPath 无默认值：本地值由引导文件非 nacos 段提供，仅显式配置时生效
+	if cfg.LocalPath != "" {
+		t.Fatalf("localPath=%q, want empty by default", cfg.LocalPath)
 	}
 }
 

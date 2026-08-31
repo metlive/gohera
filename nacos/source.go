@@ -24,8 +24,9 @@ type Source struct {
 // Init 在 InitApp 中、MySQL/Redis 初始化之前调用：
 // 0. 引导文件的非 nacos 段（如有）经 MergeBase 合入 base（环境级本地配置）
 // 1. nacos.enabled=true → 按 mode(http|grpc) 拉取并合并，注册监听
-// 2. 拉取失败且 failLocalFallback → 合并 localPath
-// 3. nacos 未启用 → 若存在 localPath 则合并本地兜底
+// 2. 拉取失败且 failLocalFallback → 本地值（已合入 base）继续生效；
+//    显式配置的 localPath（nacos.localPath / NACOS_LOCAL_PATH）存在时合并
+// 3. nacos 未启用 → 同上，仅显式 localPath 存在时合并
 func (s *Source) Init() error {
 	cfg, body, err := s.loadBootstrap()
 	if err != nil {
@@ -69,10 +70,12 @@ func (s *Source) Init() error {
 
 	if err != nil {
 		if cfg.FailLocalFallback {
-			fmt.Fprintf(os.Stderr, "[gohera] nacos fetch failed (mode=%s), fallback to %s: %v\n", mode, cfg.LocalPath, err)
 			if localFileExists(cfg.LocalPath) {
+				fmt.Fprintf(os.Stderr, "[gohera] nacos fetch failed (mode=%s), fallback to %s: %v\n", mode, cfg.LocalPath, err)
 				return s.mergeLocalFallback(cfg.LocalPath, cfg.ConfigFormat)
 			}
+			// 本地值（引导文件非 nacos 段，已合入 base）继续生效
+			fmt.Fprintf(os.Stderr, "[gohera] nacos fetch failed (mode=%s), running on local config: %v\n", mode, err)
 			return nil
 		}
 		return err
