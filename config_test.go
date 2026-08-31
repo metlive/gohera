@@ -45,7 +45,8 @@ func writeFile(t *testing.T, path, content string) {
 
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	// 5s 上限：fsnotify 事件在高负载机器上偶发延迟（去抖 100ms + 事件投递）
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return
@@ -592,6 +593,99 @@ func TestDiscoverMultipleFilesError(t *testing.T) {
 	_, err := discoverConfigFile()
 	if err == nil {
 		t.Fatal("expected multiple file error")
+	}
+}
+
+func TestDiscoverExcludesBootstrapAndNacosFiles(t *testing.T) {
+	// 仅 bootstrap* / nacos.* 存在时不当作 app 配置，也不报 multiple 错误
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, filepath.Join(dir, "bootstrap.yaml"), "nacos:\n  enabled: true\n")
+	writeFile(t, filepath.Join(dir, "bootstrap-dev.yaml"), "nacos:\n  enabled: false\n")
+	writeFile(t, filepath.Join(dir, "bootstrap-prod.yaml"), "nacos:\n  enabled: true\n")
+	writeFile(t, filepath.Join(dir, "nacos.dev.yaml"), "mysql:\n  a: 1\n")
+	t.Setenv("APP_CONFIG_FILE", "")
+	t.Setenv("APP_CONFIG", "")
+	got, err := discoverConfigFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Fatalf("got %q, want empty path", got)
+	}
+}
+
+func TestDiscoverSingleNonBootstrapFile(t *testing.T) {
+	// 目录内唯一候选仍自动使用（沿用原行为），bootstrap 不参与
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, filepath.Join(dir, "main.yaml"), "http:\n  port: 1\n")
+	writeFile(t, filepath.Join(dir, "bootstrap.yaml"), "nacos:\n  enabled: true\n")
+	t.Setenv("APP_CONFIG_FILE", "")
+	t.Setenv("APP_CONFIG", "")
+	got, err := discoverConfigFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(got) != "main.yaml" {
+		t.Fatalf("got %q, want main.yaml", got)
+	}
+}
+
+func TestMergeBase(t *testing.T) {
+	// 环境级本地配置（bootstrap-{env}.yaml 非 nacos 段）合入 base：
+	// 覆盖 app.yaml 同名键、保留未覆盖键、新增段；overlay（远程/兜底）仍高于其
+	resetStore()
+	setBase(map[string]any{
+		"http": map[string]any{"port": 8080, "service": "app"},
+		"log":  map[string]any{"stdout": true},
+	})
+	store.mergeBase(map[string]any{
+		"http":  map[string]any{"port": 9090},
+		"mysql": map[string]any{"dispatcher": map[string]any{"host": "h"}},
+	})
+	if got := GetInt("http.port"); got != 9090 {
+		t.Fatalf("port=%d, want mergeBase override", got)
+	}
+	if got := GetString("http.service"); got != "app" {
+		t.Fatalf("service=%q, want base value kept", got)
+	}
+	if !GetBool("log.stdout") {
+		t.Fatal("unrelated base section lost")
+	}
+	if !IsSet("mysql.dispatcher.host") {
+		t.Fatal("new section not added")
+	}
+
+	store.applyOverlay(map[string]any{"http": map[string]any{"port": 7070}})
+	if got := GetInt("http.port"); got != 7070 {
+		t.Fatalf("port=%d, want overlay to beat mergeBase", got)
+	}
+}
+
+func TestStoreInitEmpty(t *testing.T) {
+	// 仅 bootstrap.yaml 存在（无 app 配置文件）：空 base 可启动，overlay 照常生效
+	resetStore()
+	if err := store.initEmpty(); err != nil {
+		t.Fatal(err)
+	}
+	if appConfigLoaded() {
+		t.Fatal("appConfigLoaded should be false after initEmpty")
+	}
+	if IsSet("http.port") {
+		t.Fatal("empty base should have no keys")
+	}
+	var cfg struct {
+		HTTP struct {
+			Port int `mapstructure:"port"`
+		} `mapstructure:"http"`
+	}
+	if err := Unmarshal(&cfg); err != nil {
+		t.Fatalf("unmarshal on empty base: %v", err)
+	}
+	store.applyOverlay(map[string]any{"http": map[string]any{"port": 9090}})
+	if got := GetInt("http.port"); got != 9090 {
+		t.Fatalf("port=%d, want overlay value on empty base", got)
 	}
 }
 

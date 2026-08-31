@@ -56,6 +56,33 @@ func (s *configStore) init(path string) error {
 	return nil
 }
 
+// initEmpty 以空 base 初始化（无 app 配置文件、仅依赖 bootstrap/Nacos 提供配置时使用），
+// 不启动文件 watch；后续 overlay 合并照常生效。
+func (s *configStore) initEmpty() error {
+	s.mu.Lock()
+	s.basePath = ""
+	s.base = map[string]any{}
+	s.snapshot.Store(s.buildLocked())
+	s.mu.Unlock()
+	return nil
+}
+
+// mergeBase 将环境级本地配置（bootstrap-{env}.yaml 非 nacos 段）深合并进 base 层：
+// 覆盖 app.yaml 同名键、低于 overlay（远程 Nacos / 兜底文件），重建快照并通知订阅者。
+func (s *configStore) mergeBase(m map[string]any) {
+	if len(m) == 0 {
+		return
+	}
+	s.mu.Lock()
+	if s.base == nil {
+		s.base = map[string]any{}
+	}
+	maps.Merge(configutil.Lowercase(m), s.base)
+	s.snapshot.Store(s.buildLocked())
+	s.mu.Unlock()
+	s.notify()
+}
+
 // applyOverlay 用 Nacos/兜底配置替换 overlay 层并重建快照。
 func (s *configStore) applyOverlay(overlay map[string]any) {
 	s.mu.Lock()

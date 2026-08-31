@@ -59,23 +59,30 @@ go run main.go -env=dev
 框架按以下优先级自动发现配置文件：
 1. 环境变量 `APP_CONFIG_FILE` 指定的绝对路径
 2. 在 `./`、`./config`、`./configs` 目录中查找 `app.toml` / `app.yaml` / `app.json` 等
-3. 若上述目录恰好只有一个配置文件，自动使用它
+3. 若上述目录恰好只有一个候选配置文件，自动使用它（`bootstrap*` / `nacos.*` 由各自加载器读取，不计入候选）
+
+`app.*` 与 `bootstrap.yaml` 不必同时存在：两者都在则都加载（app 为基础、Nacos 深合并覆盖）； 只有 `bootstrap.yaml` 时全部配置来自 Nacos / 本地兜底；两者皆无则 `InitApp` 启动报错。
 
 ### Nacos（可选）
 
-`InitApp` 在加载本地 `app.*` 之后、初始化 MySQL/Redis 之前，读取 `bootstrap.yaml`：
+`InitApp` 在加载本地 `app.*` 之后、初始化 MySQL/Redis 之前，读取 `bootstrap.yaml`； 若同目录存在 `bootstrap-{env}.yaml`（env 由 `-env` / `APP_ENV` 决定），则深合并覆盖到基础文件之上：
 
-| 行为                  | 说明                                                                |
-|-----------------------|---------------------------------------------------------------------|
-| `nacos.enabled=true`  | 按 `mode`（http/grpc）拉取并合并进运行时配置，并 Listen 热更新      |
-| `nacos.enabled=false` | 若存在 `configs/nacos.{env}.yaml`（或 `nacos.localPath`），自动合并 |
-| `failLocalFallback`   | 远程拉取失败时合并本地兜底文件                                      |
-| `dataIdByEnv`         | Data ID 追加 `-{env}`（如 `my-app-dev`）                            |
-| `mode`                | `http`（默认，v1 SDK / OpenAPI）或 `grpc`（v2 SDK，直连 Nacos 2.x） |
-| `grpcPort`            | gRPC 端口，可选；默认 SDK 使用 `Port+1000`                          |
+| 行为                   | 说明                                                                                  |
+|------------------------|---------------------------------------------------------------------------------------|
+| `bootstrap-{env}.yaml` | 环境覆盖文件（如 `bootstrap-prod.yaml`），深合并覆盖 `bootstrap.yaml`，只写差异项即可 |
+| `nacos.enabled=true`   | 按 `mode`（http/grpc）拉取并合并进运行时配置，并 Listen 热更新                        |
+| `nacos.enabled=false`  | 若存在 `configs/nacos.{env}.yaml`（或 `nacos.localPath`），自动合并                   |
+| `failLocalFallback`    | 远程拉取失败时合并本地兜底文件                                                        |
+| `dataIdByEnv`          | Data ID 追加 `-{env}`（如 `my-app-dev`）                                              |
+| `mode`                 | `http`（默认，v1 SDK / OpenAPI）或 `grpc`（v2 SDK，直连 Nacos 2.x）                   |
+| `grpcPort`             | gRPC 端口，可选；默认 SDK 使用 `Port+1000`                                            |
+
+配置值优先级：`APP_*` 环境变量 > 远程 Nacos / 本地兜底文件（`configs/nacos.{env}.yaml`）> `bootstrap-{env}.yaml` 非 nacos 段（环境级本地配置）> `app.yaml`。 Nacos 连接参数（`nacos:` 段）：`NACOS_*` 环境变量 > `bootstrap-{env}.yaml` > `bootstrap.yaml`。
+
+引导文件除 `nacos:` 段外还可携带环境级本地配置（`mysql` / `redis` / `auth` 等）： 非 nacos 段会合入 base 层（覆盖 `app.yaml` 同名键，低于远程 Nacos / 兜底文件）， 因此每个环境一个文件即可同时声明 Nacos 连接与本地默认值。
 
 ```yaml
-# configs/bootstrap.yaml
+# configs/bootstrap.yaml（公共基础）
 nacos:
   enabled: false
   mode: http
@@ -85,6 +92,18 @@ nacos:
   dataIdByEnv: true
   failLocalFallback: true
   group: "DEFAULT_GROUP"
+
+# configs/bootstrap-prod.yaml（生产覆盖，只需差异项）
+nacos:
+  enabled: true
+  serverAddr: "http://nacos-gateway-prod.example/tcm-api"
+
+# configs/bootstrap-dev.yaml（开发：nacos 段 + 环境级本地配置，远程可达时被覆盖）
+nacos:
+  enabled: true
+mysql:
+  dispatcher:
+    host: 127.0.0.1
 ```
 
 业务侧只需 `gohera.InitApp()`，然后使用 `gohera.Mysql` / `gohera.Redis` / `gohera.GetString`；无需自行接入 Nacos。

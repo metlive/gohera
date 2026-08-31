@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/knadh/koanf/maps"
 	"github.com/metlive/gohera/internal/configutil"
 	"github.com/spf13/cast"
 )
@@ -35,10 +36,19 @@ type bootstrapConfig struct {
 	GrpcPort          uint64 // grpc 模式可选；0 表示 SDK 默认 Port+1000
 }
 
-func (s *Source) loadBootstrap() (*bootstrapConfig, error) {
-	m, err := loadBootstrapFile(s.SearchPaths)
+// loadBootstrap 解析引导文件：返回 nacos 连接配置 + 引导文件中 nacos 段之外的内容
+// （body，环境级本地配置，由 Init 经 MergeBase 合入 base 层，优先级低于远程/兜底 overlay）。
+func (s *Source) loadBootstrap() (*bootstrapConfig, map[string]any, error) {
+	m, err := s.loadBootstrapFile(s.SearchPaths)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	body := map[string]any{}
+	for k, v := range m {
+		if k != "nacos" {
+			body[k] = v
+		}
 	}
 
 	str := func(key string) string {
@@ -85,27 +95,55 @@ func (s *Source) loadBootstrap() (*bootstrapConfig, error) {
 
 	applyEnvOverrides(cfg)
 	s.applyDefaults(cfg)
-	return cfg, nil
+	return cfg, body, nil
 }
 
-// loadBootstrapFile 在 SearchPaths 中查找 bootstrap.yaml/yml/json/toml，
-// 找到则加载（key 已 lowercase），找不到返回 nil（与现网 _ = ReadInConfig 一致）。
-func loadBootstrapFile(searchPaths []string) (map[string]any, error) {
+// loadBootstrapFile 在 SearchPaths 中查找 bootstrap 配置（key 已 lowercase）：
+// 同一目录内先加载 bootstrap.{ext}（公共基础），再加载 bootstrap-{env}.{ext}（环境覆盖，
+// env 来自 currentEnv），环境文件深合并覆盖基础；目录内两者皆无则继续下一目录，
+// 全部找不到返回 nil（与现网 _ = ReadInConfig 一致，未启用时仅走本地兜底）。
+func (s *Source) loadBootstrapFile(searchPaths []string) (map[string]any, error) {
+	env := s.currentEnv()
 	exts := []string{".yaml", ".yml", ".json", ".toml"}
 	for _, dir := range searchPaths {
-		for _, ext := range exts {
-			path := filepath.Join(dir, "bootstrap"+ext)
-			if !localFileExists(path) {
-				continue
-			}
-			m, err := configutil.LoadFile(path)
-			if err != nil {
-				return nil, fmt.Errorf("load bootstrap %s: %w", path, err)
-			}
-			return m, nil
+		base, basePath, err := loadFirstBootstrapFile(dir, "bootstrap", exts)
+		if err != nil {
+			return nil, err
 		}
+		envCfg, envPath, err := loadFirstBootstrapFile(dir, "bootstrap-"+env, exts)
+		if err != nil {
+			return nil, err
+		}
+		if base == nil && envCfg == nil {
+			continue
+		}
+		switch {
+		case base != nil && envCfg != nil:
+			maps.Merge(envCfg, base) // 环境文件优先（就地深合并）
+		case envCfg != nil: // 仅环境文件（自包含写法）
+			base = envCfg
+		}
+		fmt.Fprintf(os.Stderr, "[gohera] nacos bootstrap: base=%s env=%s\n", orNone(basePath), orNone(envPath))
+		return base, nil
 	}
 	return nil, nil
+}
+
+// loadFirstBootstrapFile 按扩展名优先级在 dir 中查找 name{ext}，
+// 找到即加载，找不到返回 (nil, "", nil)。
+func loadFirstBootstrapFile(dir, name string, exts []string) (map[string]any, string, error) {
+	for _, ext := range exts {
+		path := filepath.Join(dir, name+ext)
+		if !localFileExists(path) {
+			continue
+		}
+		m, err := configutil.LoadFile(path)
+		if err != nil {
+			return nil, "", fmt.Errorf("load bootstrap %s: %w", path, err)
+		}
+		return m, path, nil
+	}
+	return nil, "", nil
 }
 
 func (s *Source) applyDefaults(cfg *bootstrapConfig) {
@@ -232,4 +270,11 @@ func localFileExists(path string) bool {
 	}
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func orNone(p string) string {
+	if p == "" {
+		return "(none)"
+	}
+	return p
 }

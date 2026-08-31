@@ -3,26 +3,43 @@ package nacos
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 // Source 负责加载 Nacos bootstrap，并在启用时按 mode（http|grpc）拉取远程配置、
 // 经 Merge 回调写回应用配置并注册热更新监听。
 type Source struct {
-	DefaultEnv  string                     // 当前环境兜底值（根传 gohera.DeployEnvDev）
-	Env         func() string              // 当前运行环境（根传 GetEnv）
-	SearchPaths []string                   // bootstrap.yaml 搜索目录（根传 configSearchPaths）
-	Merge       func(map[string]any) error // 将远程/兜底配置写回根 store 并刷新缓存
+	DefaultEnv string // 当前环境兜底值（根传 gohera.DeployEnvDev）
+	Env        func() string
+	// SearchPaths bootstrap.yaml 搜索目录（根传 configSearchPaths）
+	SearchPaths []string
+	// Merge 将远程/兜底配置写回根 store 的 overlay 层（覆盖 base，含热更新）
+	Merge func(map[string]any) error
+	// MergeBase 将引导文件（bootstrap*.yaml）中 nacos 段之外的内容合入 base 层：
+	// 环境级本地配置，覆盖 app.yaml 同名键、低于远程/兜底 overlay。可选，未设置时忽略。
+	MergeBase func(map[string]any) error
 }
 
 // Init 在 InitApp 中、MySQL/Redis 初始化之前调用：
+// 0. 引导文件的非 nacos 段（如有）经 MergeBase 合入 base（环境级本地配置）
 // 1. nacos.enabled=true → 按 mode(http|grpc) 拉取并合并，注册监听
 // 2. 拉取失败且 failLocalFallback → 合并 localPath
 // 3. nacos 未启用 → 若存在 localPath 则合并本地兜底
 func (s *Source) Init() error {
-	cfg, err := s.loadBootstrap()
+	cfg, body, err := s.loadBootstrap()
 	if err != nil {
 		return err
+	}
+
+	if len(body) > 0 {
+		if s.MergeBase == nil {
+			fmt.Fprintf(os.Stderr, "[gohera] nacos bootstrap local config ignored (MergeBase not set)\n")
+		} else if err := s.MergeBase(body); err != nil {
+			return fmt.Errorf("merge bootstrap local config: %w", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "[gohera] nacos bootstrap local config merged (%d sections)\n", len(body))
+		}
 	}
 
 	if !cfg.Enabled {
@@ -74,6 +91,23 @@ func (s *Source) Init() error {
 	default:
 		return nil
 	}
+}
+
+// BootstrapExists 报告 SearchPaths 中是否存在任一 bootstrap 文件
+// （bootstrap.{ext} 公共基础或 bootstrap-{env}.{ext} 当前环境覆盖）。
+// 供 InitApp 校验「app 配置与 Nacos 引导至少存在其一」。
+func (s *Source) BootstrapExists() bool {
+	env := s.currentEnv()
+	exts := []string{".yaml", ".yml", ".json", ".toml"}
+	for _, dir := range s.SearchPaths {
+		for _, ext := range exts {
+			if localFileExists(filepath.Join(dir, "bootstrap"+ext)) ||
+				localFileExists(filepath.Join(dir, "bootstrap-"+env+ext)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // currentEnv 返回 Env() 结果，为空时回落 DefaultEnv，再回落 "dev"（保持原行为）。

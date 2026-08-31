@@ -33,7 +33,9 @@ func init() {
 }
 
 // initAppConfig 初始化应用配置
-// 扫描 ./、./config、./configs 目录，按优先级发现并加载配置文件
+// 扫描 ./、./config、./configs 目录，按优先级发现并加载配置文件；
+// 未发现时 base 置空（允许仅 bootstrap.yaml 存在、全部配置来自 Nacos 的用法），
+// InitApp 会校验 app 配置与 Nacos 引导至少存在其一
 func initAppConfig() error {
 	initConfigOnce.Do(func() {
 		path, err := discoverConfigFile()
@@ -41,15 +43,27 @@ func initAppConfig() error {
 			initConfigErr = err
 			return
 		}
+		if path == "" {
+			initConfigErr = store.initEmpty()
+			return
+		}
 		initConfigErr = store.init(path)
 	})
 	return initConfigErr
 }
 
+// appConfigLoaded 报告是否加载了本地 app 配置文件（仅 bootstrap.yaml 存在时为 false）。
+func appConfigLoaded() bool {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return store.basePath != ""
+}
+
 // discoverConfigFile 按优先级发现配置文件：
 // 1. APP_CONFIG_FILE 指定绝对路径
 // 2. APP_CONFIG 或默认 app 作为文件名，在搜索路径中按扩展名匹配
-// 3. 某目录下仅有一个配置文件时使用该文件
+// 3. 某目录下仅有一个候选配置文件时使用该文件（bootstrap* / nacos.* 不计入候选）
+// 4. 均未命中返回空路径（合法状态：仅 bootstrap.yaml 存在时全部配置来自 Nacos）
 func discoverConfigFile() (string, error) {
 	if path := os.Getenv("APP_CONFIG_FILE"); path != "" {
 		if _, err := os.Stat(path); err != nil {
@@ -88,7 +102,8 @@ func discoverConfigFile() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no config file found in %v", configSearchPaths)
+	// 未发现 app 配置文件：返回空路径而非报错，是否致命由 InitApp 依据 bootstrap 存在性决定
+	return "", nil
 }
 
 func findConfigByName(dir, name string) (string, bool) {
@@ -101,6 +116,8 @@ func findConfigByName(dir, name string) (string, bool) {
 	return "", false
 }
 
+// listConfigFiles 列出目录中的候选 app 配置文件；
+// bootstrap*（Nacos 引导）与 nacos.*（本地兜底）由各自加载器读取，不计入候选。
 func listConfigFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -112,7 +129,7 @@ func listConfigFiles(dir string) ([]string, error) {
 
 	var candidates []string
 	for _, entry := range entries {
-		if entry.IsDir() || !isConfigFile(entry.Name()) {
+		if entry.IsDir() || !isAppConfigFile(entry.Name()) {
 			continue
 		}
 		candidates = append(candidates, filepath.Join(dir, entry.Name()))
@@ -128,6 +145,23 @@ func isConfigFile(name string) bool {
 		}
 	}
 	return false
+}
+
+// isAppConfigFile 判断是否为 app 配置候选：排除 gohera 专用文件
+// （bootstrap / bootstrap-{env} / nacos.{env}），避免其被当作 app 配置加载
+// 或触发 "multiple config files" 误报。
+func isAppConfigFile(name string) bool {
+	if !isConfigFile(name) {
+		return false
+	}
+	stem := strings.ToLower(name)
+	for _, ext := range configExtensions {
+		stem = strings.TrimSuffix(stem, ext)
+	}
+	if stem == "bootstrap" || strings.HasPrefix(stem, "bootstrap-") {
+		return false
+	}
+	return !strings.HasPrefix(stem, "nacos.")
 }
 
 // GetConfig 获取原始配置值

@@ -28,14 +28,15 @@ func InitApp() (router *gin.Engine) {
 		panic(fmt.Errorf("env parse fail ：  %s \n", err))
 	}
 
-	// 初始化应用配置
+	// 初始化应用配置（app.yaml 可选：仅 bootstrap.yaml 存在时 base 为空，配置来自 Nacos/兜底）
 	err = initAppConfig()
 	if err != nil {
 		panic(fmt.Errorf("init config fail ：  %s \n", err))
 	}
 
 	// Nacos（可选）：合并远程配置后再初始化 MySQL/Redis
-	// bootstrap.yaml：nacos.enabled + mode=http|grpc；未启用时合并 configs/nacos.{env}.yaml
+	// bootstrap.yaml（公共基础）+ bootstrap-{env}.yaml（环境覆盖，深合并）；未启用时合并 configs/nacos.{env}.yaml
+	// 引导文件的非 nacos 段作为环境级本地配置合入 base（低于远程/兜底 overlay）
 	nacosSource := &nacos.Source{
 		DefaultEnv:  DeployEnvDev,
 		Env:         GetEnv,
@@ -44,9 +45,18 @@ func InitApp() (router *gin.Engine) {
 			store.applyOverlay(settings)
 			return nil
 		},
+		MergeBase: func(settings map[string]any) error {
+			store.mergeBase(settings)
+			return nil
+		},
 	}
 	if err = nacosSource.Init(); err != nil {
 		panic(fmt.Errorf("init nacos config fail ：  %s \n", err))
+	}
+
+	// app 配置与 Nacos 引导可各自单独存在，但至少其一：两者皆无则无从加载任何配置
+	if !appConfigLoaded() && !nacosSource.BootstrapExists() {
+		panic(fmt.Errorf("no app config or nacos bootstrap found in %v (need app.yaml or bootstrap.yaml)\n", configSearchPaths))
 	}
 
 	// 初始化日志：从配置桥接到独立 logger 包（可覆盖此前仅控制台的 Init）
