@@ -1,20 +1,12 @@
 # gohera
 
-基于 [Gin](https://github.com/gin-gonic/gin) 的轻量级 Web 框架，集成项目开发中常用的基础设施，开箱即用。
+gohera 是基于 [Gin](https://github.com/gin-gonic/gin) 的 Go Web 应用框架，面向业务服务的常见脚手架需求：把配置、日志、数据库、缓存、HTTP 调用和请求链路串成一条可启动路径，减少每个项目重复拼基础设施的成本。
 
-## 核心能力
+一次 `gohera.InitApp()` 会完成环境解析、配置加载（本地文件，可选 Nacos 合并与热更新）、日志初始化，以及按配置连接 MySQL / Redis，并返回可用的 Gin 引擎；业务侧再注册路由并调用 `StartupService` 即可对外提供 HTTP 服务。配置层基于 [Koanf](https://github.com/knadh/koanf)，支持 TOML / YAML / JSON；日志基于 [zap](https://github.com/uber-go/zap)，按级别分文件、按天切割，并与请求中的 trace / span 关联。
 
-| 模块        | 说明                                                                                                                    |
-|-------------|-------------------------------------------------------------------------------------------------------------------------|
-| 配置        | 基于 [Koanf](https://github.com/knadh/koanf)，自动发现配置文件，支持 TOML / YAML / JSON；可选 Nacos（HTTP/gRPC）合并与热更新 |
-| 日志        | 基于 [zap](https://github.com/uber-go/zap)，按天分割，自动关联链路追踪上下文                                            |
-| MySQL       | 基于 [xorm](https://xorm.io/)，连接池、读写分离、事务封装                                                               |
-| Redis       | 连接池、字符串/哈希/列表/集合/有序集合操作、分布式锁、令牌桶限流                                                        |
-| HTTP 客户端 | 链式 API，支持超时、重试、链路追踪自动传播                                                                              |
-| 参数校验    | 基于 `go-playground/validator`，支持丰富的校验规则                                                                      |
-| 定时任务    | 基于 [cron](https://github.com/robfig/cron)，秒级精度，提供便捷的时间表达                                               |
-| SSE 流      | Server-Sent Events 客户端，支持流式消费                                                                                 |
-| 其他        | Panic 恢复、健康检查、Pprof 性能分析、跨域中间件                                                                        |
+框架也按能力拆成可独立引用的子包：不需要完整应用时，可只使用 `logger`、`okhttp`、`mysql`、`redis`、`sqlite` 等，不必跑 `InitApp`。完整应用与独立包共用同一套实现，`InitApp` 负责把配置桥接到各子包。
+
+主要能力包括：配置读写与可选 Nacos；结构化日志与链路上下文；MySQL（[xorm](https://xorm.io/) 连接池与事务）与 Redis（常用数据结构、分布式锁、限流）；链式 HTTP 客户端（超时、重试、trace 传播）及 SSE；参数校验、秒级 cron、健康检查、跨域、Panic 恢复与可选 pprof。
 
 ## 安装
 
