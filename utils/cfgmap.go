@@ -1,5 +1,6 @@
-// Package configutil 提供配置内核的共享工具：koanf parser 选择与 key 归一化。
-package configutil
+// Package utils 提供跨包共享的通用工具。
+// 配置相关能力见 cfgmap.go：解析、key 归一化与点号 Lookup。
+package utils
 
 import (
 	"fmt"

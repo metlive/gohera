@@ -5,3 +5,6 @@
 docs/
 .idea/go.imports.xml
 .idea/
+.cursor/
+.claude/
+.DS_Store

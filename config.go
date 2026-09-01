@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 	"github.com/spf13/cast"
 )
 
@@ -305,7 +305,7 @@ func UnmarshalKey(key string, rawVal any) error {
 	if snap == nil {
 		return errors.New("config: not loaded")
 	}
-	v, ok := configutil.Lookup(snap.nested, strings.ToLower(key))
+	v, ok := utils.Lookup(snap.nested, strings.ToLower(key))
 	if !ok {
 		return fmt.Errorf("config key %q not found", key)
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 	"github.com/metlive/gohera/mysql"
 	"github.com/metlive/gohera/redis"
 )
@@ -435,7 +435,7 @@ func TestFileReloadKeepsOverlay(t *testing.T) {
 	path := filepath.Join(dir, "app.yaml")
 	writeFile(t, path, "http:\n  port: 8080\n")
 
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestReloadInvalidYAMLKeepsSnapshot(t *testing.T) {
 	path := filepath.Join(dir, "app.yaml")
 	writeFile(t, path, "http:\n  port: 8080\n")
 
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +496,7 @@ func TestWatchRenameAndRemoveCreate(t *testing.T) {
 	path := filepath.Join(dir, "app.yaml")
 	writeFile(t, path, "http:\n  port: 8080\n")
 
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,7 +528,7 @@ func TestWatchBadFileKeepsSnapshot(t *testing.T) {
 	path := filepath.Join(dir, "app.yaml")
 	writeFile(t, path, "http:\n  port: 8080\n")
 
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

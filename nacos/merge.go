@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 )
 
 // merge 将远程/兜底配置解析后经 Merge 回调写回应用配置（深合并）并刷新缓存。
@@ -37,7 +37,7 @@ func parseConfigContent(content, format string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return configutil.Parse([]byte(content), t)
+	return utils.Parse([]byte(content), t)
 }
 
 func normalizeConfigType(format string) (string, error) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/knadh/koanf/maps"
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 	"github.com/spf13/cast"
 )
 
@@ -52,17 +52,17 @@ func (s *Source) loadBootstrap() (*bootstrapConfig, map[string]any, error) {
 	}
 
 	str := func(key string) string {
-		v, _ := configutil.Lookup(m, key)
+		v, _ := utils.Lookup(m, key)
 		out, _ := cast.ToStringE(v)
 		return out
 	}
 	boolean := func(key string) bool {
-		v, _ := configutil.Lookup(m, key)
+		v, _ := utils.Lookup(m, key)
 		out, _ := cast.ToBoolE(v)
 		return out
 	}
 	u64 := func(key string) uint64 {
-		v, _ := configutil.Lookup(m, key)
+		v, _ := utils.Lookup(m, key)
 		out, _ := cast.ToUint64E(v)
 		return out
 	}
@@ -137,7 +137,7 @@ func loadFirstBootstrapFile(dir, name string, exts []string) (map[string]any, st
 		if !localFileExists(path) {
 			continue
 		}
-		m, err := configutil.LoadFile(path)
+		m, err := utils.LoadFile(path)
 		if err != nil {
 			return nil, "", fmt.Errorf("load bootstrap %s: %w", path, err)
 		}

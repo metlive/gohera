@@ -12,7 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/knadh/koanf/maps"
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 )
 
 // configSnapshot 是一次 rebuild 发布的只读配置视图：
@@ -41,7 +41,7 @@ var store = &configStore{}
 
 // init 加载本地配置文件并启动目录级 Watch（仅首次成功加载后）。
 func (s *configStore) init(path string) error {
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (s *configStore) mergeBase(m map[string]any) {
 	if s.base == nil {
 		s.base = map[string]any{}
 	}
-	maps.Merge(configutil.Lowercase(m), s.base)
+	maps.Merge(utils.Lowercase(m), s.base)
 	s.snapshot.Store(s.buildLocked())
 	s.mu.Unlock()
 	s.notify()
@@ -89,7 +89,7 @@ func (s *configStore) applyOverlay(overlay map[string]any) {
 	if overlay == nil {
 		s.overlay = nil
 	} else {
-		s.overlay = configutil.Lowercase(overlay)
+		s.overlay = utils.Lowercase(overlay)
 	}
 	s.snapshot.Store(s.buildLocked())
 	s.mu.Unlock()
@@ -105,7 +105,7 @@ func (s *configStore) reloadFromFile() {
 		return
 	}
 
-	base, err := configutil.LoadFile(path)
+	base, err := utils.LoadFile(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[gohera] config reload failed: %v\n", err)
 		return
@@ -119,10 +119,10 @@ func (s *configStore) reloadFromFile() {
 }
 
 // buildLocked 三层合并（base < overlay < env）并生成快照。调用方需持有写锁。
-// configutil.Lowercase 同时完成深拷贝与 key 归一化，保证快照与源层隔离。
+// utils.Lowercase 同时完成深拷贝与 key 归一化，保证快照与源层隔离。
 func (s *configStore) buildLocked() *configSnapshot {
-	nested := configutil.Lowercase(s.base)
-	maps.Merge(configutil.Lowercase(s.overlay), nested)
+	nested := utils.Lowercase(s.base)
+	maps.Merge(utils.Lowercase(s.overlay), nested)
 	applyEnv(nested)
 	return &configSnapshot{flat: flattenMap(nested), nested: nested}
 }

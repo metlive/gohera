@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/metlive/gohera/internal/configutil"
+	"github.com/metlive/gohera/utils"
 	"github.com/spf13/cast"
 )
 
@@ -80,7 +80,7 @@ func TestParseConfigContent_YAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, ok := configutil.Lookup(m, "mysql.dispatcher.host")
+	v, ok := utils.Lookup(m, "mysql.dispatcher.host")
 	if !ok || cast.ToString(v) != "127.0.0.1" {
 		t.Fatalf("host=%v ok=%v", v, ok)
 	}
@@ -91,7 +91,7 @@ func TestParseConfigContent_Lowercase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, ok := configutil.Lookup(m, "http.port")
+	v, ok := utils.Lookup(m, "http.port")
 	if !ok || cast.ToInt(v) != 8080 {
 		t.Fatalf("lowercase lookup failed: v=%v ok=%v", v, ok)
 	}
@@ -142,13 +142,13 @@ func TestLoadBootstrapFile_EnvOverlay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := configutil.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "test.example" {
+	if v, _ := utils.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "test.example" {
 		t.Fatalf("serveraddr=%v, want env overlay wins", v)
 	}
-	if v, _ := configutil.Lookup(m, "nacos.enabled"); cast.ToBool(v) != true {
+	if v, _ := utils.Lookup(m, "nacos.enabled"); cast.ToBool(v) != true {
 		t.Fatalf("enabled=%v, want base value kept", v)
 	}
-	if v, _ := configutil.Lookup(m, "nacos.group"); cast.ToString(v) != "BASE_GROUP" {
+	if v, _ := utils.Lookup(m, "nacos.group"); cast.ToString(v) != "BASE_GROUP" {
 		t.Fatalf("group=%v, want base value kept", v)
 	}
 }
@@ -163,7 +163,7 @@ func TestLoadBootstrapFile_EnvOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := configutil.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "prod.example" {
+	if v, _ := utils.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "prod.example" {
 		t.Fatalf("serveraddr=%v, want env-only file loaded", v)
 	}
 }
@@ -178,7 +178,7 @@ func TestLoadBootstrapFile_BaseOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := configutil.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "base.example" {
+	if v, _ := utils.Lookup(m, "nacos.serveraddr"); cast.ToString(v) != "base.example" {
 		t.Fatalf("serveraddr=%v, want base file as-is", v)
 	}
 }
@@ -197,7 +197,7 @@ func TestLoadBootstrapFile_MissThenHitNextDir(t *testing.T) {
 	if m == nil {
 		t.Fatal("want config from second search dir")
 	}
-	if v, _ := configutil.Lookup(m, "nacos.enabled"); cast.ToBool(v) {
+	if v, _ := utils.Lookup(m, "nacos.enabled"); cast.ToBool(v) {
 		t.Fatalf("enabled=%v, want false", v)
 	}
 }
@@ -229,7 +229,7 @@ func TestLoadBootstrapReturnsBody(t *testing.T) {
 	if cfg.ServerAddr != "dev.example" {
 		t.Fatalf("serveraddr=%q", cfg.ServerAddr)
 	}
-	if v, ok := configutil.Lookup(body, "mysql.dispatcher.host"); !ok || cast.ToString(v) != "127.0.0.1" {
+	if v, ok := utils.Lookup(body, "mysql.dispatcher.host"); !ok || cast.ToString(v) != "127.0.0.1" {
 		t.Fatalf("body should carry non-nacos sections: %v", body)
 	}
 	if _, ok := body["nacos"]; ok {
@@ -258,7 +258,7 @@ func TestInitMergesBootstrapBody(t *testing.T) {
 	if err := s.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if v, ok := configutil.Lookup(base, "mysql.dispatcher.host"); !ok || cast.ToString(v) != "127.0.0.1" {
+	if v, ok := utils.Lookup(base, "mysql.dispatcher.host"); !ok || cast.ToString(v) != "127.0.0.1" {
 		t.Fatalf("MergeBase should receive mysql section: %v", base)
 	}
 	if overlay != nil {
